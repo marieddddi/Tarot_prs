@@ -9,17 +9,17 @@
 
 #include "fonctions.h"  // Si cette fonction est définie ailleurs
 
-int main(){
-    struct carte jeu[78];
-    creer_jeu(jeu);
-
-
-    //creer paquet
+// Exemple d'utilisation
+int main() {
     struct paquet p;
     creer_paquet(&p);
-    for (int i = 0; i < p.nb_cartes; i++){
-        printf("Carte %d : %c %s\n", i, p.jeu[i].couleur, p.jeu[i].valeur);
+
+    printf("Jeu complet:\n");
+    for (int i = 0; i < p.nb_cartes; i++) {
+        printf("Carte: %c%s, Points: %.1f\n", p.jeu[i].couleur, p.jeu[i].valeur, p.jeu[i].points);
     }
+
+    printf("Score total du paquet: %.1f\n", calculer_score(&p));
 
     return 0;
 }
