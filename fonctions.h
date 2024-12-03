@@ -3,6 +3,7 @@
 struct carte{
     char couleur;
     char valeur[3];
+    float point;
 };
 
 //strucutre d'un paquet 
