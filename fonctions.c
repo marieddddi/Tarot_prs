@@ -54,42 +54,65 @@ bool est_atout(struct carte *carte){
     if (carte->couleur == ' '){
         return true;
     }
+    printf ("Ce n'est pas un atout\n");
     return false;
 }
 
-bool possede_couleur (struct carte *carte, char couleur){
+bool est_meme_couleur (struct carte *carte, char couleur){
     if (carte->couleur == couleur){
         return true;
     }
+    printf ("Couleur differente\n");
     return false;
 }
 
-bool accepter_carte(struct carte *cartePrecedente, struct carte *carteActuelle){
+bool possede_couleur(struct paquet *p, char couleur){
+    for (int i = 0; i < p->nb_cartes; i++){
+        if (p->jeu[i].couleur == couleur){
+            return true;
+        }
+    }
+    printf ("Vous ne possedez pas de carte de cette couleur\n");
+    return false;
+}
+
+bool accepter_carte(struct carte *cartePrecedente, struct carte *carteActuelle, struct paquet *paquet){
     //si precedent nul accepte
     if (cartePrecedente == NULL){
+        printf ("Carte precedente nulle\n");
         return true;
     }
-    //si couleur identique accepte
-    if (cartePrecedente->couleur == carteActuelle->couleur){
+    //si couleur identique et que ce n'est pas un atout on accepte
+    if (! est_atout(carteActuelle) && est_meme_couleur(carteActuelle, cartePrecedente->couleur)){
+        printf ("Couleur identique\n");
         return true;
     }
 
     //si on a pas de carte de la meme couleur et que c'est un atout
-    if (! possede_couleur(cartePrecedente, carteActuelle->couleur) && est_atout(carteActuelle)){
+    if (! possede_couleur(paquet, cartePrecedente->couleur) && est_atout(carteActuelle)){
+        printf ("Atout\n");
         return true;
     }
 
     //si on a pas de carte de la meme couleur et qu'on a pas d'atout
-    if (! possede_couleur(cartePrecedente, carteActuelle->couleur) && ! possede_couleur (cartePrecedente, ' ')){
+    if (! possede_couleur(paquet, cartePrecedente->couleur) && ! possede_couleur (cartePrecedente, ' ')){
+        printf ("Pas de couleur et pas d'atout\n");
         return true;
     }
 
     // si on a un atout et que la carte actuelle est un atout, on regarde bien que la carte actuelle est plus forte
     if (est_atout(cartePrecedente) && est_atout(carteActuelle)){
-        if (carteActuelle->point > cartePrecedente->point){
+        //on affiche la carte precedente et la carte actuelle
+        printf ("Atout\n");
+        printf ("Carte precedente: %c %s %f\n", cartePrecedente->couleur, cartePrecedente->valeur, cartePrecedente->point);
+        printf ("Carte actuelle: %c %s %f\n", carteActuelle->couleur, carteActuelle->valeur, carteActuelle->point);
+        if (carteActuelle->valeur[0] > cartePrecedente->valeur[0]){
+            printf ("Atout plus fort\n");
             return true;
         }
     }
+    printf ("Vous ne pouvez pas jouer cette carte\n");
+    return false;
 }
 
 
@@ -104,6 +127,40 @@ int main(){
     for (int i = 0; i < p.nb_cartes; i++){
         printf("Carte %d: %c %s %f\n", i, p.jeu[i].couleur, p.jeu[i].valeur, p.jeu[i].point);
     }
-
+    //on creait une carte precedente
+    struct carte cartePrecedente;
+    init_carte(&cartePrecedente);
+    cartePrecedente.couleur = ' ';
+    cartePrecedente.valeur[0] = '3';
+    cartePrecedente.valeur[1] = '\0';
+    cartePrecedente.point = 0.5;
+    //on choisit une carte actuelle
+    struct carte carteActuelle;
+    init_carte(&carteActuelle);
+    carteActuelle.couleur = ' ';
+    carteActuelle.valeur[0] = '5';
+    carteActuelle.valeur[1] = '\0';
+    carteActuelle.point = 0.5;
+   
+   //on cree une carte atout 
+    struct carte carteAtout;
+    init_carte(&carteAtout);
+    carteAtout.couleur = ' ';
+    carteAtout.valeur[0] = '4';
+    carteAtout.valeur[1] = '\0';
+    carteAtout.point = 4.5;
+    
+   //on cree un jeu de 2 cartes 
+    struct paquet jeu2;
+    creer_paquet(&jeu2);
+    jeu2.jeu[0] = carteAtout;
+    jeu2.jeu[1] = carteActuelle;
+    jeu2.nb_cartes = 2;
+    //on teste si on accepte la carte
+    if (accepter_carte(&cartePrecedente, &carteAtout, &jeu2)){
+        printf("On accepte la carte\n");
+    } else {
+        printf("On refuse la carte\n");
+    }
     return 0;
 }
