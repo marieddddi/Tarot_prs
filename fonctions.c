@@ -54,7 +54,6 @@ bool est_atout(struct carte *carte){
     if (carte->couleur == ' '){
         return true;
     }
-    printf ("Ce n'est pas un atout\n");
     return false;
 }
 
@@ -62,7 +61,6 @@ bool est_meme_couleur (struct carte *carte, char couleur){
     if (carte->couleur == couleur){
         return true;
     }
-    printf ("Couleur differente\n");
     return false;
 }
 
@@ -95,7 +93,7 @@ bool accepter_carte(struct carte *cartePrecedente, struct carte *carteActuelle, 
     }
 
     //si on a pas de carte de la meme couleur et qu'on a pas d'atout
-    if (! possede_couleur(paquet, cartePrecedente->couleur) && ! possede_couleur (cartePrecedente, ' ')){
+    if (! possede_couleur(paquet, cartePrecedente->couleur) && ! possede_couleur(paquet, ' ')){
         printf ("Pas de couleur et pas d'atout\n");
         return true;
     }
@@ -110,9 +108,27 @@ bool accepter_carte(struct carte *cartePrecedente, struct carte *carteActuelle, 
             printf ("Atout plus fort\n");
             return true;
         }
+        //si on peut mettre qu'un atout plus faible
+        for (int i = 0; i < paquet->nb_cartes; i++){
+            if (est_atout(&paquet->jeu[i]) && paquet->jeu[i].valeur[0] > cartePrecedente->valeur[0]){
+                printf ("Atout plus fort\n");
+                return false;
+            }
+        }
+        printf ("Atout plus faible pas le choix\n");
+        return true;
     }
     printf ("Vous ne pouvez pas jouer cette carte\n");
     return false;
+}
+
+
+float calculer_points(struct paquet *paquet){
+    float points = 0;
+    for (int i = 0; i < paquet->nb_cartes; i++){
+        points += paquet->jeu[i].point;
+    }
+    return points;
 }
 
 
@@ -130,14 +146,14 @@ int main(){
     //on creait une carte precedente
     struct carte cartePrecedente;
     init_carte(&cartePrecedente);
-    cartePrecedente.couleur = ' ';
+    cartePrecedente.couleur = 'D';
     cartePrecedente.valeur[0] = '3';
     cartePrecedente.valeur[1] = '\0';
     cartePrecedente.point = 0.5;
     //on choisit une carte actuelle
     struct carte carteActuelle;
     init_carte(&carteActuelle);
-    carteActuelle.couleur = ' ';
+    carteActuelle.couleur = 'T';
     carteActuelle.valeur[0] = '5';
     carteActuelle.valeur[1] = '\0';
     carteActuelle.point = 0.5;
@@ -145,10 +161,10 @@ int main(){
    //on cree une carte atout 
     struct carte carteAtout;
     init_carte(&carteAtout);
-    carteAtout.couleur = ' ';
-    carteAtout.valeur[0] = '4';
+    carteAtout.couleur = 'C';
+    carteAtout.valeur[0] = '5';
     carteAtout.valeur[1] = '\0';
-    carteAtout.point = 4.5;
+    carteAtout.point = 0.5;
     
    //on cree un jeu de 2 cartes 
     struct paquet jeu2;
@@ -162,5 +178,7 @@ int main(){
     } else {
         printf("On refuse la carte\n");
     }
+
+    printf ("Points: %f\n", calculer_points(&jeu2));
     return 0;
 }
