@@ -7,6 +7,8 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
+#include <string.h>
 
 #include "fonctions.h"  // Si cette fonction est définie ailleurs
 
@@ -131,6 +133,60 @@ float calculer_points(struct paquet *paquet){
     return points;
 }
 
+//definir le plus grand contrat: si que 0 on refait un tour !
+float contrat (char choix_contrat){
+    if (strcmp(choix_contrat, "Passe") == 0){
+        return 0;
+    }
+    if (strcmp(choix_contrat, "Petite") == 0){
+        return 1;
+    }
+    if (strcmp(choix_contrat, "Garde") == 0){
+        return 2;
+    }
+    return 3; //3 = erreur 
+}
+
+//dscore que l'on a fait, on doit voir si on a des bouts dans notre jeu -> a utiliser a la fin de la partie car on peut recuperer des bouts (1)
+float score(struct paquet *paquet){
+    int nb_bout = 0;
+    float nb_points = 0;
+    for (int i = 0; i < paquet->nb_cartes; i++){
+        if ((paquet->jeu[i].valeur[0] == '1' && paquet->jeu[i].couleur == ' ') || (paquet->jeu[i].valeur[0] == '21' && paquet->jeu[i].couleur == ' ') || (paquet->jeu[i].valeur[0] == '*' && paquet->jeu[i].couleur == ' ')){
+            nb_bout += 1;
+        }
+    }
+    
+    //on definit le nombre de points a atteindre
+    switch (nb_bout)
+    {
+    case 1:
+        nb_points = 51;
+        break;
+    case 2:
+        nb_points = 41;
+        break;
+    case 3:
+        nb_points = 36;
+        break;
+    
+    default:
+        nb_points = 56;
+        break;
+    }
+    return calculer_points(paquet) - nb_points;
+}
+
+float score_final(struct paquet *paquet, char choix_contrat, bool preneur){
+    if (score(paquet) >= 0){
+        if (preneur) return (25 + score(paquet)) * contrat(choix_contrat)*3;
+        else return -(25 + score(paquet)) * contrat(choix_contrat);
+    }
+    else {
+        if (preneur) return - (25 + score(paquet)) * contrat(choix_contrat)*3;
+        else return (25 + score(paquet)) * contrat(choix_contrat);
+    }
+}
 
 int main(){
     struct carte jeu[78];
