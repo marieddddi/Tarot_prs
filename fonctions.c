@@ -1,16 +1,4 @@
-#include <sys/types.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <string.h>
-#include <stdbool.h>
-#include <time.h>
-#include <string.h>
-
-#include "fonctions.h"  // Si cette fonction est définie ailleurs
+#include "fonctions.h"  
 
 
 // Initialisation de la structure d'une carte
@@ -134,18 +122,19 @@ float calculer_points(struct paquet *paquet){
 }
 
 //definir le plus grand contrat: si que 0 on refait un tour !
-float contrat (char choix_contrat){
+float contrat (char *choix_contrat){
     if (strcmp(choix_contrat, "Passe") == 0){
         return 0;
     }
-    if (strcmp(choix_contrat, "Petite") == 0){
+    else if (strcmp(choix_contrat, "Petite") == 0){
         return 1;
     }
-    if (strcmp(choix_contrat, "Garde") == 0){
+    else if (strcmp(choix_contrat, "Garde") == 0){
         return 2;
     }
     return 3; //3 = erreur 
 }
+
 
 //dscore que l'on a fait, on doit voir si on a des bouts dans notre jeu -> a utiliser a la fin de la partie car on peut recuperer des bouts (1)
 float score(struct paquet *paquet){
@@ -188,6 +177,45 @@ float score_final(struct paquet *paquet, char choix_contrat, bool preneur){
     }
 }
 
+// Fonction qui permet de distribuer les cartes
+void distribuer_cartes(struct paquet *jeu, struct paquet *j1, struct paquet *j2, struct paquet *j3, struct paquet *j4, struct paquet *chien) {
+    // Mélange du jeu
+    srand(time(NULL));  // Initialisation du générateur de nombres aléatoires
+    for (int i = 0; i < jeu->nb_cartes; i++) {
+        int j = rand() % jeu->nb_cartes;  // Sélection aléatoire d'une carte
+        struct carte temp = jeu->jeu[i];  // Echange des cartes
+        jeu->jeu[i] = jeu->jeu[j];
+        jeu->jeu[j] = temp;
+    }
+
+    // Initialisation des paquets des joueurs et du chien
+    j1->nb_cartes = 0;
+    j2->nb_cartes = 0;
+    j3->nb_cartes = 0;
+    j4->nb_cartes = 0;
+    chien->nb_cartes = 0;
+
+    // Distribution des cartes
+    for (int i = 0; i < jeu->nb_cartes; i++) {
+        if (i < 18) {  // 18 cartes pour le joueur 1
+            j1->jeu[j1->nb_cartes++] = jeu->jeu[i];
+        }
+        else if (i < 36) {  // 18 cartes pour le joueur 2
+            j2->jeu[j2->nb_cartes++] = jeu->jeu[i];
+        }
+        else if (i < 54) {  // 18 cartes pour le joueur 3
+            j3->jeu[j3->nb_cartes++] = jeu->jeu[i];
+        }
+        else if (i < 72) {  // 18 cartes pour le joueur 4
+            j4->jeu[j4->nb_cartes++] = jeu->jeu[i];
+        }
+        else {  // Les cartes restantes pour le chien
+            chien->jeu[chien->nb_cartes++] = jeu->jeu[i];
+        }
+    }
+}
+
+/*
 int main(){
     struct carte jeu[78];
     creer_jeu(jeu);
@@ -236,5 +264,37 @@ int main(){
     }
 
     printf ("Points: %f\n", calculer_points(&jeu2));
+
+    //test distribution des cartes
+    struct paquet j1, j2, j3, j4, chien;
+    creer_paquet(&j1);
+    creer_paquet(&j2);
+    creer_paquet(&j3);
+    creer_paquet(&j4);
+    creer_paquet(&chien);
+    distribuer_cartes(&p, &j1, &j2, &j3, &j4, &chien);
+    printf ("Joueur 1\n");
+    for (int i = 0; i < j1.nb_cartes; i++){
+        printf("Carte %d: %c %s %f\n", i, j1.jeu[i].couleur, j1.jeu[i].valeur, j1.jeu[i].point);
+    }
+    printf ("Joueur 2\n");
+    for (int i = 0; i < j2.nb_cartes; i++){
+        printf("Carte %d: %c %s %f\n", i, j2.jeu[i].couleur, j2.jeu[i].valeur, j2.jeu[i].point);
+    }
+    printf ("Joueur 3\n");
+    for (int i = 0; i < j3.nb_cartes; i++){
+        printf("Carte %d: %c %s %f\n", i, j3.jeu[i].couleur, j3.jeu[i].valeur, j3.jeu[i].point);
+    }
+    printf ("Joueur 4\n");
+    for (int i = 0; i < j4.nb_cartes; i++){
+        printf("Carte %d: %c %s %f\n", i, j4.jeu[i].couleur, j4.jeu[i].valeur, j4.jeu[i].point);
+    }
+    printf ("Chien\n");
+    for (int i = 0; i < chien.nb_cartes; i++){
+        printf("Carte %d: %c %s %f\n", i, chien.jeu[i].couleur, chien.jeu[i].valeur, chien.jeu[i].point);
+    }
+
+
+
     return 0;
-}
+}*/

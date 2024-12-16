@@ -1,5 +1,11 @@
 {
     "files.associations": {
-        "wait.h": "c"
+        "wait.h": "c",
+        "ipc.h": "c",
+        "fonctions.h": "c",
+        "string.h": "c",
+        "types.h": "c",
+        "stdbool.h": "c",
+        "stdio.h": "c"
     }
 }

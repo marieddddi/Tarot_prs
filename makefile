@@ -1,22 +1,30 @@
 CC = gcc
 CFLAGS = -Wall -g
 
-# Détecte tous les fichiers .c commençant par "exo" et contenant un chiffre.
-SRCS = $(wildcard *.c)
-# Remplace l'extension .c par .o pour obtenir les fichiers objets correspondants.
-OBJS = $(SRCS:.c=.o)
-# Remplace l'extension .c par rien pour obtenir les noms des exécutables.
-EXES = $(SRCS:.c=)
+# Fichiers sources
+SRCS_SERVER = serveur.c fonctions.c
+SRCS_CLIENT = client.c fonctions.c
+OBJS_SERVER = $(SRCS_SERVER:.c=.o)
+OBJS_CLIENT = $(SRCS_CLIENT:.c=.o)
 
+# Liste des exécutables
+EXES = serveur client
+
+# Cible par défaut
 all: $(EXES)
 
-# Règle générique pour créer chaque exécutable à partir de son fichier objet.
-%: %.o
-	$(CC) $(CFLAGS) -o $@ $^
+# Règle pour l'exécutable serveur
+serveur: $(OBJS_SERVER)
+	$(CC) $(CFLAGS) -o serveur $(OBJS_SERVER)
 
-# Règle générique pour créer chaque fichier objet à partir de son fichier source .c.
+# Règle pour l'exécutable client
+client: $(OBJS_CLIENT)
+	$(CC) $(CFLAGS) -o client $(OBJS_CLIENT)
+
+# Règle générique pour compiler les fichiers .o du serveur
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
 
+# Cible pour nettoyer les fichiers générés
 clean:
-	rm -f $(OBJS) $(EXES)
+	rm -f $(OBJS_SERVER) $(OBJS_CLIENT) $(EXES)
