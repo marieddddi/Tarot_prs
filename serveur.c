@@ -32,7 +32,6 @@ void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
     distribuer_cartes(jeu, &j1, &j2, &j3, &j4, &chien);
 
     struct paquet *joueurs[] = {&j1, &j2, &j3, &j4};
-    struct paquet *chien_ptr = &chien;
     struct msg_buffer message;
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -42,13 +41,14 @@ void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
         for (int j = 0; j < joueurs[i]->nb_cartes; j++) {
             char carte_info[50];
             snprintf(carte_info, sizeof(carte_info), "%c %s %.1f\n", 
-                joueurs[i]->jeu[j].couleur, 
-                joueurs[i]->jeu[j].valeur, 
-                joueurs[i]->jeu[j].point);
+                     joueurs[i]->jeu[j].couleur, 
+                     joueurs[i]->jeu[j].valeur, 
+                     joueurs[i]->jeu[j].point);
             strcat(buffer, carte_info);
         }
 
-        strcpy(message.msg_text, buffer);
+        strncpy(message.msg_text, buffer, MSG_SIZE - 1);
+        message.msg_text[MSG_SIZE - 1] = '\0'; // Assurer une terminaison sécurisée
 
         if (msgsnd(msgid, &message, sizeof(message.msg_text), 0) == -1) {
             perror("Erreur lors de l'envoi du message");
@@ -58,53 +58,76 @@ void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
     }
 }
 
-char *niveau_contrat(char *choix_contrat) {
-    // Augmenter la taille allouée pour éviter les débordements
-    char *contrats_possibles = malloc(100);  // Allouer plus de mémoire
-    if (contrats_possibles == NULL) {
-        perror("Erreur d'allocation mémoire");
-        exit(EXIT_FAILURE);
-    }
+void niveau_contrat(char *choix_contrat, char *contrat_precedent, char *resultat) {
+    // Nettoyer le buffer de résultat
+    memset(resultat, 0, 100);
 
     printf("Choix du contrat: %s\n", choix_contrat);
-    float niveau = contrat(choix_contrat);
+    float niveau = contrat(choix_contrat); // Fonction utilisateur "contrat"
     printf("Niveau du contrat: %f\n", niveau);
 
-    if (niveau == 0) strcpy(contrats_possibles, "Passe, Petite, Garde");
-    else if (niveau == 1) strcpy(contrats_possibles, "Garde");
-    else strcpy(contrats_possibles, "Pas de contrat possible");
+    if (niveau == 0) {
+        strncpy(resultat, contrat_precedent, 99);
+    } else if (niveau == 1) {
+        strncpy(resultat, "Passe, Garde", 99);
+    } else {
+        strncpy(resultat, "Passe", 99);
+    }
 
-    printf("Contrats possibles: %s\n", contrats_possibles);
-    return contrats_possibles;
+    resultat[99] = '\0'; // Assurer une terminaison sécurisée
+    printf("Contrats possibles: %s\n", resultat);
 }
-
 
 void demande_contrat(int msgid, int ordre_joueurs[], int nb_joueurs) {
     struct msg_buffer message;
     struct msg_buffer message_reponse;
-    strcpy(message.msg_text, "Passe");
+
+    strcpy(message_reponse.msg_text, "Passe");  // Valeur par défaut
+
+    char contrats_possibles[100] = "Passe, Petite, Garde";  // Contrats initiaux
 
     for (int i = 0; i < nb_joueurs; i++) {
         int joueur = ordre_joueurs[i];
 
-        // Préparer et envoyer la demande
+        // Calculer les contrats possibles
+        char nouveaux_contrats[100];
+        niveau_contrat(message_reponse.msg_text, contrats_possibles, nouveaux_contrats);
+        strncpy(contrats_possibles, nouveaux_contrats, 99);
+        contrats_possibles[99] = '\0';
+
+        // Préparer et envoyer la demande de contrat
+        memset(&message, 0, sizeof(message));
         message.msg_type = joueur;
-        char *contrats_possibles = niveau_contrat(message.msg_text);
-        strcpy(message.msg_text, contrats_possibles);
-        printf ("Contrats possibles dans le message : %s\n", message.msg_text);
+        strncpy(message.msg_text, contrats_possibles, MSG_SIZE - 1);
+        message.msg_text[MSG_SIZE - 1] = '\0';
+
+        printf("Contrats possibles dans le message : %s\n", message.msg_text);
 
         if (msgsnd(msgid, &message, sizeof(message.msg_text), 0) == -1) {
             perror("Erreur lors de l'envoi de la demande de contrat");
             exit(EXIT_FAILURE);
         }
-        printf("Demande envoyée au joueur %d.\n", joueur);
+        printf("Demande envoyée au joueur %d avec msg_type = %d.\n", joueur, joueur);
 
-        // Attendre la réponse du joueur
-        while (msgrcv(msgid, &message_reponse, sizeof(message_reponse.msg_text), joueur, 0) == -1);
-        printf("Contrat reçu du joueur %d : %s\n", joueur, message_reponse.msg_text);
+        memset(&message_reponse, 0, sizeof(message_reponse));
+
+        // Attendre une réponse valide
+        while (1) {
+            if (msgrcv(msgid, &message_reponse, sizeof(message_reponse.msg_text), joueur, 0) == -1) {
+                perror("Erreur lors de la réception de la réponse du contrat");
+                continue;
+            }
+
+            if (strlen(message_reponse.msg_text) == 0) {
+                printf("Réponse vide reçue du joueur %d, attente d'une réponse valide...\n", joueur);
+                continue;
+            }
+
+            printf("Réponse du joueur %d : %s\n", joueur, message_reponse.msg_text);
+            break;
+        }
     }
 }
-
 
 int main() {
     int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
@@ -122,17 +145,11 @@ int main() {
     printf("Tous les joueurs sont prêts. Distribution des cartes...\n");
     distribuer_cartes_aux_clients(msgid, &jeu);
 
-    //on définit l'ordre des joueurs. On commence par le joueur 1, puis le joueur 2, etc.
-    //Si on fait une autre partie, on commencera par le joueur 2, puis le joueur 3, etc.
     int ordre_joueurs[MAX_CLIENTS] = {1, 2, 3, 4};
 
-    //on demande au joueur 1 de choisir un contrat puis au joueur 2, etc. en adaptant les contrats possibles
-    //use fonction contrat
     demande_contrat(msgid, ordre_joueurs, MAX_CLIENTS);
-    
 
-
-    // Suppression de la file de messages 
+    // Suppression de la file de messages
     msgctl(msgid, IPC_RMID, NULL);
     printf("Serveur terminé.\n");
     return 0;
