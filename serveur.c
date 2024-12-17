@@ -55,6 +55,12 @@ void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
             exit(EXIT_FAILURE);
         }
         printf("Cartes envoyées au joueur %d.\n", i + 1);
+
+        //regarde si on a bien recu mess du client qui indique qu'il a bien recu les cartes
+        if (msgrcv(msgid, &message, sizeof(message.msg_text), i + 1, 0) == -1) {
+            perror("Erreur lors de la réception du message de confirmation de réception des cartes");
+            exit(EXIT_FAILURE);
+        }
     }
 }
 

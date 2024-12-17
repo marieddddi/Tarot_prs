@@ -46,6 +46,14 @@ int main(int argc, char *argv[]) {
     }
     printf("Cartes reçues par le joueur %d :\n%s\n", client_id, message.msg_text);
 
+//envoie cartes recues
+    message.msg_type = client_id;
+    strcpy (message.msg_text, "cartes recues");
+    if (msgsnd(msgid, &message, sizeof(message.msg_text), 0) == -1) {
+        perror("Erreur lors de l'envoi du message de disponibilité");
+        return EXIT_FAILURE;
+    }
+
     // Attendre la demande de contrat
     if (msgrcv(msgid, &message, sizeof(message.msg_text), client_id, 0) == -1) {
         perror("Erreur lors de la réception de la demande de contrat");
