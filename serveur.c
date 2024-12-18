@@ -10,6 +10,7 @@
 #define MAX_CLIENTS 4
 #define MSG_SIZE 1024
 
+
 // Structure d'un message
 struct msg_buffer {
     long msg_type;
@@ -40,7 +41,7 @@ void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
 
         for (int j = 0; j < joueurs[i]->nb_cartes; j++) {
             char carte_info[50];
-            snprintf(carte_info, sizeof(carte_info), "%c %s %.1f\n", 
+            snprintf(carte_info, sizeof(carte_info), "%d %c %s %.1f\n", j+1,
                      joueurs[i]->jeu[j].couleur, 
                      joueurs[i]->jeu[j].valeur, 
                      joueurs[i]->jeu[j].point);
@@ -85,8 +86,12 @@ void niveau_contrat(char *choix_contrat, char *contrat_precedent, char *resultat
 }
 
 void demande_contrat(int msgid, int ordre_joueurs[], int nb_joueurs) {
+    char contrats_joueurs[MAX_CLIENTS][100]; 
+    memset(contrats_joueurs, 0, sizeof(contrats_joueurs)); // Réinitialisation des contrats des joueurs
+
     struct msg_buffer message;
     struct msg_buffer message_reponse;
+    memset(&message_reponse, 0, sizeof(message_reponse));
 
     strcpy(message_reponse.msg_text, "Passe");  // Valeur par défaut
 
@@ -117,23 +122,45 @@ void demande_contrat(int msgid, int ordre_joueurs[], int nb_joueurs) {
 
         memset(&message_reponse, 0, sizeof(message_reponse));
 
-        // Attendre une réponse valide
-        while (1) {
-            if (msgrcv(msgid, &message_reponse, sizeof(message_reponse.msg_text), joueur, 0) == -1) {
-                perror("Erreur lors de la réception de la réponse du contrat");
-                continue;
-            }
-
-            if (strlen(message_reponse.msg_text) == 0) {
-                printf("Réponse vide reçue du joueur %d, attente d'une réponse valide...\n", joueur);
-                continue;
-            }
-
-            printf("Réponse du joueur %d : %s\n", joueur, message_reponse.msg_text);
+        
+        if (msgrcv(msgid, &message_reponse, sizeof(message_reponse.msg_text), joueur, 0) == -1) {
+            perror("Erreur lors de la réception de la réponse du contrat");
             break;
         }
+        printf("Réponse du joueur %d : %s\n", joueur, message_reponse.msg_text);
+
+       // Stocker le contrat du joueur dans un tableau
+        strncpy(contrats_joueurs[joueur], message_reponse.msg_text, 99);
+        contrats_joueurs[joueur][99] = '\0'; // Assurer une terminaison sécurisée
+    }
+
+    // Afficher les contrats de tous les joueurs
+    for (int i = 1; i < nb_joueurs+1; i++) {
+        printf("Contrat du joueur %d : %s\n", i, contrats_joueurs[i]);
+    }
+
+    // Déterminer le preneur
+    int preneur = 0;
+    int niveau_max = 0;  // Initialisation du niveau maximum
+    for (int i = 1; i < nb_joueurs+1; i++) {
+        int val_en_cours = contrat(contrats_joueurs[i]);
+        printf ("Contrat du joueur %d : %d\n", i, val_en_cours);
+        if (val_en_cours > niveau_max) {
+            preneur = i;
+            niveau_max = val_en_cours;
+        }
+    }
+    if (preneur == 0) {
+        printf("Aucun preneur trouvé.\n");
+        //on relance la fonction
+       // demande_contrat(msgid, ordre_joueurs, nb_joueurs);
+    } else {
+        printf("Le preneur est le joueur %d avec un contrat de niveau %d\n", preneur, niveau_max);
+
     }
 }
+
+struct paquet chien();
 
 int main() {
     int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
@@ -154,6 +181,9 @@ int main() {
     int ordre_joueurs[MAX_CLIENTS] = {1, 2, 3, 4};
 
     demande_contrat(msgid, ordre_joueurs, MAX_CLIENTS);
+
+    //on determine le preneur
+
 
     // Suppression de la file de messages
     msgctl(msgid, IPC_RMID, NULL);
