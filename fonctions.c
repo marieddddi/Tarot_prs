@@ -215,6 +215,14 @@ void distribuer_cartes(struct paquet *jeu, struct paquet *j1, struct paquet *j2,
     }
 }
 
+void afficher_paquet(struct paquet *paquet) {
+    for (int i = 0; i < paquet->nb_cartes; i++) {
+        printf("%c %s \n", paquet->jeu[i].couleur, paquet->jeu[i].valeur);
+    }
+}
+
+
+
 /*
 int main(){
     struct carte jeu[78];
