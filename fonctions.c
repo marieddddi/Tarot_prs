@@ -112,6 +112,24 @@ bool accepter_carte(struct carte *cartePrecedente, struct carte *carteActuelle, 
     return false;
 }
 
+//fonction pour savoir qui a la plus forte carte
+int qui_a_la_plus_forte_carte(struct carte *cartePrecedente, struct carte *carteActuelle) {
+    //si precedent nul accepte
+    if (cartePrecedente == NULL){
+        return 1;
+    }
+    //si c'est un atout on regarde la valeur de la carte, si c'est un atout que celle d'avant non, on accpete
+    //si c'est une autre couleur que la coueleur de base, elle est plus faible 
+    //si la carte actuelle est plus forte que la carte precedente, si c'est egal on regarde la valeur (ex: 9>8, mais en points 4.5>0.5 si le cas des atouts avant est pas valide)
+    if (carteActuelle->point > cartePrecedente->point){
+        return 1;
+    }
+    //si la carte actuelle est moins forte que la carte precedente
+    else if (carteActuelle->point < cartePrecedente->point){
+        return 0;
+    }
+}
+
 
 float calculer_points(struct paquet *paquet){
     float points = 0;

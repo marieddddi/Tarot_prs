@@ -33,6 +33,25 @@ void afficher_nombre_messages(int msgid) {
     printf("Nombre de messages dans la file : %ld\n", buf.msg_qnum);
 }
 
+void envoyer_message(int msgid, char *message) {
+    struct msg_buffer msg;
+
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        msg.msg_type = i+1;
+
+        // Réinitialiser le buffer avant de copier le message
+        memset(msg.msg_text, 0, MSG_SIZE);
+        strncpy(msg.msg_text, message, MSG_SIZE - 1);
+        msg.msg_text[MSG_SIZE - 1] = '\0'; // S'assurer que le message est terminé
+
+        if (msgsnd(msgid, &msg, strlen(msg.msg_text) + 1, 0) == -1) {
+            perror("Erreur lors de l'envoi du message");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    sleep(0.5); // Permet de donner du temps aux clients pour traiter les messages
+}
 
 void attendre_clients(int msgid) {
     struct msg_buffer message;
@@ -178,6 +197,29 @@ int demande_contrat(int msgid, int ordre_joueurs[], int nb_joueurs) {
     return preneur;
 }
 
+void envoyer_jeu(int msgid, struct paquet *paquet, int preneur) {
+    struct msg_buffer message;
+    char buffer[MSG_SIZE] = "";
+
+    for (int i = 0; i < paquet->nb_cartes; i++) {
+        char carte_info[50];
+        snprintf(carte_info, sizeof(carte_info), "%d %c %s\n", i + 1,
+                 paquet->jeu[i].couleur, 
+                 paquet->jeu[i].valeur);
+        strcat(buffer, carte_info);
+    }
+
+        message.msg_type = preneur;
+        strncpy(message.msg_text, buffer, MSG_SIZE - 1);
+        message.msg_text[MSG_SIZE - 1] = '\0';
+
+        if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1) {
+            perror("Erreur lors de l'envoi du chien");
+            exit(EXIT_FAILURE);
+        }
+        printf("jeu envoyé au joueur %d.\n", preneur);
+}
+
 void montrer_chien(int msgid, struct paquet *chien) {
     struct msg_buffer message;
     char buffer[MSG_SIZE] = "";
@@ -204,7 +246,7 @@ void montrer_chien(int msgid, struct paquet *chien) {
     }
 }
 
-void envoyer_jeu_avec_chien(int msgid, int preneur, struct paquet *chien, struct paquet *paquet) {
+struct paquet *envoyer_jeu_avec_chien(int msgid, int preneur, struct paquet *chien, struct paquet *paquet) {
     struct msg_buffer message;
 
     // Ajout des cartes du chien au paquet
@@ -235,29 +277,63 @@ void envoyer_jeu_avec_chien(int msgid, int preneur, struct paquet *chien, struct
         exit(EXIT_FAILURE);
     }
     printf("Paquet envoyé au preneur, avec %d cartes.\n", paquet->nb_cartes);
+
+    return paquet;
 }
 
 void faire_chien(int msgid, struct paquet *chien, int preneur, struct paquet *paquet) {
     struct msg_buffer message;
+    bool non_valide=true;
+    int index = 0;
     //on affiche le nb de mess dans la file 
+    //on stock le nouveau jeu fait avec afficher chien
+    envoyer_jeu_avec_chien (msgid, preneur, chien, paquet);
+    sleep(2);
+
     afficher_nombre_messages (msgid);
 
     for (int i = 0; i < 6; i++) {
-        // Réception des indices des cartes que le preneur met dans le chien
-        if (msgrcv(msgid, &message, MSG_SIZE, preneur, 0) == -1) {
-            perror("Erreur lors de la réception des indices des cartes");
-            exit(EXIT_FAILURE);
+        while(non_valide){
+            // Réception des indices des cartes que le preneur met dans le chien
+            if (msgrcv(msgid, &message, MSG_SIZE, preneur, 0) == -1) {
+                perror("Erreur lors de la réception des indices des cartes");
+                exit(EXIT_FAILURE);
+            }
+            printf ("Indices des cartes : %s\n", message.msg_text);
+            sleep(0.5);
+
+            index = atoi(message.msg_text);
+            index = index -1;
+            printf("paquet: %d\n", paquet->nb_cartes);
+
+            // Afficher la carte correspondante
+            printf("Carte choisie : %c %s\n",
+                paquet->jeu[index].couleur,
+                paquet->jeu[index].valeur);
+            if (est_atout(&paquet->jeu[index])) {
+                printf("C'est un atout !\n");
+
+                //on envoie que c'est un atout 
+                message.msg_type = preneur;
+                strcpy ( message.msg_text, "atout");
+                if (msgsnd(msgid, &message, strlen(message.msg_text) + 1, 0) == -1) {
+                    perror("Erreur lors de l'envoi du paquet au preneur");
+                    exit(EXIT_FAILURE);
+                }
+                sleep(0.5);
+            }
+            else{
+                //on envoie que c'est bon 
+                message.msg_type = preneur;
+                strcpy ( message.msg_text, "bon");
+                if (msgsnd(msgid, &message, strlen(message.msg_text) + 1, 0) == -1) {
+                    perror("Erreur lors de l'envoi du paquet au preneur");
+                    exit(EXIT_FAILURE);
+                }
+                sleep(0.5);
+                non_valide = false;
+            } 
         }
-        printf ("Indices des cartes : %s\n", message.msg_text);
-
-        int index = atoi(message.msg_text);
-        index = index -1;
-        printf("paquet: %d\n", paquet->nb_cartes);
-
-        // Afficher la carte correspondante
-        printf("Carte choisie : %c %s\n",
-               paquet->jeu[index].couleur,
-               paquet->jeu[index].valeur);
 
         // Ajouter la carte au paquet_preneur
         paquet_preneur.jeu[paquet_preneur.nb_cartes] = paquet->jeu[index];
@@ -272,17 +348,24 @@ void faire_chien(int msgid, struct paquet *chien, int preneur, struct paquet *pa
         printf("Carte ajoutée au chien. Le paquet preneur contient maintenant %d cartes.\n",
                paquet_preneur.nb_cartes);
         printf("Le paquet contient maintenant %d cartes.\n", paquet->nb_cartes);
-        envoyer_jeu_avec_chien (msgid, preneur, &chien, paquet);
+        //on envoie le nouveau jeu 
+        envoyer_jeu (msgid, paquet, preneur);
+        sleep(2);
+        non_valide = true;
     }
 
     // Afficher le nombre final de messages dans la file
     afficher_nombre_messages(msgid);
     //on affiche le contenu dans paquet_preneur 
     afficher_paquet(&paquet_preneur);
-
-
 }
 
+void joueur_un_tour (int msgid, struct paquet *paquet_adversaires, struct paquet *paquet_preneur, int preneur, int ordre[ MAX_CLIENTS]){
+    //methode: on demande a tour de role la carte que le joueur souhaite jouer, et on verifie à l'aide de la fonction accepter_carte
+    //si la carte est acceptée, on la joue, sinon on continue a demander
+    //on determine le joueur qui prend, on met donc a jour l'ordre (on commence ensuite par lui)
+    //les paquets sont aussi mis a jour
+}
 
 int main() {
     int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
@@ -311,16 +394,18 @@ int main() {
 
     printf("Montrons le chien...\n");
     montrer_chien(msgid, &chien);
-    afficher_nombre_messages (msgid);
 
-    printf("ici");
-
-    envoyer_jeu_avec_chien (msgid, preneur, &chien, joueurs[preneur -1]);
-    sleep(1);
-    afficher_nombre_messages (msgid);
     faire_chien (msgid, &chien, preneur, joueurs[preneur-1]);
+
+    //une fois le chien fait, on envoie à chaque que le chien est fait
+    char *message = "Le chien est fait ! Commencons à jouer !";
+    envoyer_message (msgid, message);
+
+    //au debut, c'est le joueur 1 qui joue, ensuite l'ordre sera fait par celui qui prendra le tour
+    int joueur_courant = ordre_joueurs [0];
+
                     
-   // msgctl(msgid, IPC_RMID, NULL);
+    // msgctl(msgid, IPC_RMID, NULL);
     printf("Serveur terminé.\n");
     return 0;
 }

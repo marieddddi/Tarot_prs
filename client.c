@@ -41,6 +41,16 @@ void joueur_pret(int msgid, int client_id) {
     printf("Joueur %d prêt.\n", client_id);
 }
 
+void recevoir_message (int msgid, int client_id) {
+    struct msg_buffer message;
+    if (msgrcv(msgid, &message, MSG_SIZE, client_id, 0) == -1) {
+        perror("Erreur lors de la réception du message");
+        exit(EXIT_FAILURE);
+    }
+    printf("%s\n", message.msg_text);
+    sleep(0.5);
+}
+
 void recevoir_cartes(int msgid, int client_id) {
     struct msg_buffer message;
 
@@ -122,36 +132,62 @@ void montrer_chien(int msgid, int client_id) {
 
 void faire_chien_client(int msgid, int preneur) {
     struct msg_buffer message_reponse;
+    bool ok = false;
 
     //on affihce le nb de mess dans la file
     afficher_nombre_messages (msgid);
 
-    for (int i = 0; i < 6; i++) {
-        // Afficher le jeu reçu
-        if (msgrcv(msgid, &message_reponse, MSG_SIZE, preneur, 0) == -1) {
+     if (msgrcv(msgid, &message_reponse, MSG_SIZE, preneur, 0) == -1) {
             perror("Erreur lors de la réception du message");
             exit(EXIT_FAILURE);
         }
         printf("Voici le jeu reçu : %s\n", message_reponse.msg_text);
 
-        int carte = 0;
-        // Demander à l'utilisateur de choisir une carte
-        while ( carte <= 0 || carte > 24-i) {
-            printf("Choisissez une carte à mettre dans le chien (1-%d) : ", 24-i);
-            scanf("%d", &carte);
+
+    for (int i = 0; i < 6; i++) {
+        while (!ok) {
+            int carte = 0;
+            // Demander à l'utilisateur de choisir une carte
+            while ( carte <= 0 || carte > 24-i) {
+                printf("Choisissez une carte à mettre dans le chien (1-%d) : ", 24-i);
+                scanf("%d", &carte);
+            }
+
+            // Préparer le message avec l'index de la carte choisie
+            message_reponse.msg_type = preneur;
+            snprintf(message_reponse.msg_text, MSG_SIZE, "%d", carte);  // Convertir l'index en chaîne
+
+            // Envoi de l'index de la carte choisie au serveur
+            if (msgsnd(msgid, &message_reponse, strlen(message_reponse.msg_text) + 1, 0) == -1) {
+                perror("Erreur lors de l'envoi du message");
+                exit(EXIT_FAILURE);
+            }
+            sleep(0.5);
+
+            //on recupere le mess pour savoir si la carte ets bonne ou non
+            struct msg_buffer message_reponse2;
+            if (msgrcv(msgid, &message_reponse2, MSG_SIZE, preneur , 0) == -1) {
+                perror("Erreur lors de la réception du message");
+                exit(EXIT_FAILURE);
+            }
+            sleep(0.5);
+            printf("Voici le message reçu : %s\n", message_reponse2.msg_text);
+            if (strcmp (message_reponse2.msg_text, "bon") == 0) {
+                ok = true;
+            }
+            else {
+                printf("La carte %d n'est pas bonne\n", carte);
+            }
+            printf("Vous avez choisi la carte %d\n", carte);
         }
-
-        // Préparer le message avec l'index de la carte choisie
-        message_reponse.msg_type = preneur;
-        snprintf(message_reponse.msg_text, MSG_SIZE, "%d", carte);  // Convertir l'index en chaîne
-
-        // Envoi de l'index de la carte choisie au serveur
-        if (msgsnd(msgid, &message_reponse, strlen(message_reponse.msg_text) + 1, 0) == -1) {
-            perror("Erreur lors de l'envoi du message");
+        ok = false;
+        //on affiche le nouveau jeu 
+        if (msgrcv(msgid, &message_reponse, MSG_SIZE, preneur, 0) == -1) {
+            perror("Erreur lors de la réception du message");
             exit(EXIT_FAILURE);
         }
-
-        printf("Vous avez choisi la carte %d\n", carte);
+        sleep(0.5);
+        printf("Voici le jeu reçu : %s\n", message_reponse.msg_text);
     }
 }
 
@@ -174,9 +210,8 @@ int main(int argc, char *argv[]) {
     recevoir_cartes(msgid, client_id);
     int preneur = choix_contrat_client(msgid, client_id);
     montrer_chien(msgid, client_id);
-    printf ("next \n");
     if (client_id == preneur) faire_chien_client(msgid, preneur);
-    afficher_nombre_messages (msgid);
+    recevoir_message (msgid, client_id);
     return EXIT_SUCCESS;
 
 }
