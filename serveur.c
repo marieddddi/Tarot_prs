@@ -9,7 +9,7 @@
 
 #define MSG_KEY 1234
 #define MAX_CLIENTS 4
-#define MSG_SIZE 1024
+#define MSG_SIZE 2048
 
 struct msg_buffer {
     long msg_type;
@@ -209,16 +209,44 @@ void envoyer_jeu(int msgid, struct paquet *paquet, int preneur) {
         strcat(buffer, carte_info);
     }
 
-        message.msg_type = preneur;
+    message.msg_type = preneur;
+    printf ("Envoi du jeu au preneur %d\n", preneur);
+    //affiche le jeu
+    printf("%s", buffer);
+    strncpy(message.msg_text, buffer, MSG_SIZE - 1);
+    message.msg_text[MSG_SIZE - 1] = '\0';
+
+    if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1) {
+        perror("Erreur lors de l'envoi du chien");
+        exit(EXIT_FAILURE);
+    }
+    printf("jeu envoyé au joueur %d.\n", preneur);
+}
+
+void envoyer_jeu_joueurs (int msgid, struct paquet *paquet) {
+    struct msg_buffer message;
+    char buffer[MSG_SIZE] = "";
+
+    for (int i = 0; i < paquet->nb_cartes; i++) {
+        char carte_info[50];
+        snprintf(carte_info, sizeof(carte_info), "%d %c %s\n", i + 1, 
+            paquet->jeu[i].couleur,
+            paquet->jeu[i].valeur);
+        strcat(buffer, carte_info);
+    }
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        message.msg_type = i+1;
         strncpy(message.msg_text, buffer, MSG_SIZE - 1);
         message.msg_text[MSG_SIZE - 1] = '\0';
 
-        if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1) {
-            perror("Erreur lors de l'envoi du chien");
+        if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1 ) {
+            perror("Erreur lors de l'envoi du jeu en cours");
             exit(EXIT_FAILURE);
         }
-        printf("jeu envoyé au joueur %d.\n", preneur);
+    }
+    printf("jeu envoyé à tous les joueurs.\n");
 }
+
 
 void montrer_chien(int msgid, struct paquet *chien) {
     struct msg_buffer message;
@@ -315,7 +343,7 @@ void faire_chien(int msgid, struct paquet *chien, int preneur, struct paquet *pa
 
                 //on envoie que c'est un atout 
                 message.msg_type = preneur;
-                strcpy ( message.msg_text, "atout");
+                strcpy(message.msg_text, "atout");
                 if (msgsnd(msgid, &message, strlen(message.msg_text) + 1, 0) == -1) {
                     perror("Erreur lors de l'envoi du paquet au preneur");
                     exit(EXIT_FAILURE);
@@ -360,12 +388,136 @@ void faire_chien(int msgid, struct paquet *chien, int preneur, struct paquet *pa
     afficher_paquet(&paquet_preneur);
 }
 
-void joueur_un_tour (int msgid, struct paquet *paquet_adversaires, struct paquet *paquet_preneur, int preneur, int ordre[ MAX_CLIENTS]){
-    //methode: on demande a tour de role la carte que le joueur souhaite jouer, et on verifie à l'aide de la fonction accepter_carte
-    //si la carte est acceptée, on la joue, sinon on continue a demander
-    //on determine le joueur qui prend, on met donc a jour l'ordre (on commence ensuite par lui)
-    //les paquets sont aussi mis a jour
+void retirer_carte(struct paquet *paquet, int index) {
+    // Supprimer la carte du paquet
+    //si c'est l'excuse, on la met directement dans le paquet du joueur 
+
+    for (int j = index; j < paquet->nb_cartes - 1;j++) { // On boucle sur les cartes restantes
+        paquet->jeu[j] = paquet->jeu[j + 1];
+    }
+    paquet->nb_cartes--;
 }
+
+void ajouter_carte(struct paquet *paquetAjout, struct carte *carteAjoutee) {
+    // Ajouter la carte au paquet
+    paquetAjout->jeu[paquetAjout->nb_cartes] = *carteAjoutee;
+    paquetAjout->nb_cartes++;
+}
+
+// Fonction pour mettre à jour l'ordre des joueurs
+void mettreAJourOrdreJoueurs(int ordre_joueurs[], int JoueurQuiPrend) {
+    int nouvel_ordre[MAX_CLIENTS];
+    int index = 0;
+
+    // Ajouter JoueurQuiPrend en premier
+    nouvel_ordre[index++] = JoueurQuiPrend;
+
+    // Ajouter les autres joueurs dans l'ordre cyclique
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (ordre_joueurs[i] != JoueurQuiPrend) {
+            nouvel_ordre[index++] = ordre_joueurs[i];
+        }
+    }
+
+    // Copier le nouvel ordre dans ordre_joueurs
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        ordre_joueurs[i] = nouvel_ordre[i];
+    }
+}
+
+void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *paquet_preneur, int preneur, int ordre[MAX_CLIENTS]) {
+    struct msg_buffer message;
+    int index = 0;
+    bool carte_valide = false;
+    struct carte carteLaPlusForte = {0, 0, 0};
+    char couleurJouee = ' ';
+    int joueurQuiPrendEnsuite = 0;
+    char *aToi = "a toi";
+
+    struct paquet paquet_en_cours = {0};
+
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        int joueur = ordre[i];
+        printf("Tour du joueur %d\n", joueur);
+
+        message.msg_type = joueur;
+        strncpy(message.msg_text, aToi, MSG_SIZE - 1);
+        message.msg_text[MSG_SIZE - 1] = '\0'; 
+
+        if (msgsnd(msgid, &message, sizeof(message.msg_text)+1, 0) == -1) {
+            perror("Pb envoie");
+            exit(EXIT_FAILURE);
+        }
+        printf ("Message envoyé au joueur %d\n", joueur);
+        printf ("Texte: %s\n", message.msg_text);
+        sleep(2);
+
+        if (msgrcv(msgid, &message, MSG_SIZE, joueur, 0) == -1) {
+            printf ('joueur: %d\n', joueur);
+            perror("Erreur lors de la réception de l'accusé de réception du joueur");
+            exit(EXIT_FAILURE);
+        }
+        if (strcmp(message.msg_text, "pret") != 0) {
+            fprintf(stderr, "Le joueur %d n'a pas confirmé qu'il est prêt.\n", joueur);
+            exit(EXIT_FAILURE);
+        }
+
+        sleep(2);
+        envoyer_jeu(msgid, joueurs[joueur - 1], joueur);
+        sleep(2);
+
+        while (!carte_valide) {
+            if (msgrcv(msgid, &message, MSG_SIZE, joueur, 0) == -1) {
+                perror("Erreur lors de la réception de la carte");
+                exit(EXIT_FAILURE);
+            }
+
+            printf("Carte choisie par le joueur %d : %s\n", joueur, message.msg_text);
+            sleep(2);
+            index = atoi(message.msg_text) - 1;
+
+            carte_valide = accepter_carte(&carteLaPlusForte, &joueurs[joueur - 1]->jeu[index], joueurs[joueur - 1], couleurJouee);
+
+            strcpy(message.msg_text, carte_valide ? "valide" : "non_valide");
+            message.msg_type = joueur;
+            if (msgsnd(msgid, &message, strlen(message.msg_text) + 1, 0) == -1) {
+                perror("Erreur lors de l'envoi de la validation");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        struct carte carte_jouee = joueurs[joueur - 1]->jeu[index];
+        ajouter_carte(&paquet_en_cours, &carte_jouee);
+        retirer_carte(joueurs[joueur - 1], index);
+
+        if (carte_jouee.valeur == '*' && joueur != preneur) {
+            ajouter_carte(paquet_adversaires, &carte_jouee);
+        } else if (carte_jouee.valeur == '*' && joueur == preneur) {
+            ajouter_carte(paquet_preneur, &carte_jouee);
+        }
+
+        if (qui_a_la_plus_forte_carte(&carteLaPlusForte, &carte_jouee, couleurJouee) == 1) {
+            joueurQuiPrendEnsuite = joueur;
+            carteLaPlusForte = carte_jouee;
+        }
+
+        envoyer_jeu_joueurs(msgid, &paquet_en_cours);
+        carte_valide = false;
+    }
+
+    if (joueurQuiPrendEnsuite == preneur) {
+        for (int i = 0; i < paquet_en_cours.nb_cartes; i++) {
+            ajouter_carte(paquet_preneur, &paquet_en_cours.jeu[i]);
+        }
+    } else {
+        for (int i = 0; i < paquet_en_cours.nb_cartes; i++) {
+            ajouter_carte(paquet_adversaires, &paquet_en_cours.jeu[i]);
+        }
+    }
+
+    mettreAJourOrdreJoueurs(ordre, joueurQuiPrendEnsuite);
+}
+
 
 int main() {
     int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
@@ -402,8 +554,8 @@ int main() {
     envoyer_message (msgid, message);
 
     //au debut, c'est le joueur 1 qui joue, ensuite l'ordre sera fait par celui qui prendra le tour
-    int joueur_courant = ordre_joueurs [0];
-
+    //on fait un tour
+    jouer_un_tour(msgid, &paquet_adversaires, &paquet_preneur, preneur, ordre_joueurs);
                     
     // msgctl(msgid, IPC_RMID, NULL);
     printf("Serveur terminé.\n");

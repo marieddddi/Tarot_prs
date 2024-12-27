@@ -14,7 +14,7 @@ void creer_jeu(struct carte jeu[78]){
     int i = 0;
     int j = 0;
     char couleurs[4] = {'C', 'K', 'P', 'T'};  // K = carreau, P = pique, T = trefle, C = coeur
-    char* valeurs[14] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "V", "C", "D", "R"};  // Valeurs sous forme de chaînes de caractères
+    char* valeurs[14] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "v", "C", "D", "R"};  // Valeurs sous forme de chaînes de caractères
     float points[14] = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.5, 2.5, 3.5, 4.5};  // Points associés à chaque valeur
     char* atouts[22] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "*"}; // '*' = excuse
     float points_atouts[22] = {4.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 4.5, 4.5};  // Points associés à chaque atout
@@ -64,43 +64,43 @@ bool possede_couleur(struct paquet *p, char couleur){
     return false;
 }
 
-bool accepter_carte(struct carte *cartePrecedente, struct carte *carteActuelle, struct paquet *paquet){
+bool accepter_carte(struct carte *carteLaplusForte, struct carte *carteActuelle, struct paquet *paquet, char couleurJouee){
     //si precedent nul accepte
-    if (cartePrecedente == NULL){
+    if (carteLaplusForte->valeur[0] == 0){
         printf ("Carte precedente nulle\n");
         return true;
     }
     //si couleur identique et que ce n'est pas un atout on accepte
-    if (! est_atout(carteActuelle) && est_meme_couleur(carteActuelle, cartePrecedente->couleur)){
+    if (! est_atout(carteActuelle) && est_meme_couleur(carteActuelle, couleurJouee)){
         printf ("Couleur identique\n");
         return true;
     }
 
     //si on a pas de carte de la meme couleur et que c'est un atout
-    if (! possede_couleur(paquet, cartePrecedente->couleur) && est_atout(carteActuelle)){
+    if (!est_atout(carteLaplusForte) && !possede_couleur(paquet, couleurJouee) && est_atout(carteActuelle)){
         printf ("Atout\n");
         return true;
     }
 
     //si on a pas de carte de la meme couleur et qu'on a pas d'atout
-    if (! possede_couleur(paquet, cartePrecedente->couleur) && ! possede_couleur(paquet, ' ')){
+    if (! possede_couleur(paquet, carteLaplusForte->couleur) && ! possede_couleur(paquet, ' ')){
         printf ("Pas de couleur et pas d'atout\n");
         return true;
     }
 
     // si on a un atout et que la carte actuelle est un atout, on regarde bien que la carte actuelle est plus forte
-    if (est_atout(cartePrecedente) && est_atout(carteActuelle)){
+    if (est_atout(carteLaplusForte) && est_atout(carteActuelle)){
         //on affiche la carte precedente et la carte actuelle
         printf ("Atout\n");
-        printf ("Carte precedente: %c %s %f\n", cartePrecedente->couleur, cartePrecedente->valeur, cartePrecedente->point);
+        printf ("Carte precedente: %c %s %f\n", carteLaplusForte->couleur, carteLaplusForte->valeur, carteLaplusForte->point);
         printf ("Carte actuelle: %c %s %f\n", carteActuelle->couleur, carteActuelle->valeur, carteActuelle->point);
-        if (carteActuelle->valeur[0] > cartePrecedente->valeur[0]){
+        if (carteActuelle->valeur[0] > carteLaplusForte->valeur[0]){
             printf ("Atout plus fort\n");
             return true;
         }
         //si on peut mettre qu'un atout plus faible
         for (int i = 0; i < paquet->nb_cartes; i++){
-            if (est_atout(&paquet->jeu[i]) && paquet->jeu[i].valeur[0] > cartePrecedente->valeur[0]){
+            if (est_atout(&paquet->jeu[i]) && paquet->jeu[i].valeur[0] > carteLaplusForte->valeur[0]){
                 printf ("Atout plus fort\n");
                 return false;
             }
@@ -113,19 +113,29 @@ bool accepter_carte(struct carte *cartePrecedente, struct carte *carteActuelle, 
 }
 
 //fonction pour savoir qui a la plus forte carte
-int qui_a_la_plus_forte_carte(struct carte *cartePrecedente, struct carte *carteActuelle) {
+int qui_a_la_plus_forte_carte(struct carte *carteLaPlusForte, struct carte *carteActuelle, char couleurJouee) {
     //si precedent nul accepte
-    if (cartePrecedente == NULL){
+    if (carteLaPlusForte->valeur[0] == 0){
         return 1;
     }
-    //si c'est un atout on regarde la valeur de la carte, si c'est un atout que celle d'avant non, on accpete
-    //si c'est une autre couleur que la coueleur de base, elle est plus faible 
-    //si la carte actuelle est plus forte que la carte precedente, si c'est egal on regarde la valeur (ex: 9>8, mais en points 4.5>0.5 si le cas des atouts avant est pas valide)
-    if (carteActuelle->point > cartePrecedente->point){
+    if (carteActuelle->valeur == '*'){
+        return 0;
+    }
+    //si c'est la bonne couleur, on regarde qui a la plus forte carte (selon la valeur)
+    if (carteActuelle == couleurJouee && carteActuelle->valeur[0] > carteLaPlusForte->valeur[0] && carteLaPlusForte->couleur == couleurJouee){
         return 1;
     }
-    //si la carte actuelle est moins forte que la carte precedente
-    else if (carteActuelle->point < cartePrecedente->point){
+    if (carteActuelle == couleurJouee && carteActuelle->valeur[0] < carteLaPlusForte->valeur[0] && carteLaPlusForte->couleur == couleurJouee){
+        return 0;
+    }
+    //si on joue un atout, on gagne
+    if (est_atout(carteActuelle) && !est_atout(carteLaPlusForte)) {
+        return 1;
+    }
+    if (est_atout(carteLaPlusForte) && !est_atout(carteActuelle)) {
+        return 0;
+    }
+    if (!est_atout (carteActuelle) && carteActuelle->couleur != couleurJouee){
         return 0;
     }
 }

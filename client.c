@@ -10,7 +10,7 @@
 #include <errno.h>
 
 #define MSG_KEY 1234
-#define MSG_SIZE 1024
+#define MSG_SIZE 2048
 
 struct msg_buffer {
     long msg_type;
@@ -187,8 +187,87 @@ void faire_chien_client(int msgid, int preneur) {
             exit(EXIT_FAILURE);
         }
         sleep(0.5);
-        printf("Voici le jeu reçu : %s\n", message_reponse.msg_text);
+        printf("Voici le jeu reçu : \n %s\n", message_reponse.msg_text);
     }
+}
+
+
+void faire_un_tour(int msgid, int joueur_id) {
+    struct msg_buffer message_reponse;
+    bool carte_valide = false;
+    bool permissionJouer = false;
+    int carte_choisie = 0;
+    memset (&message_reponse, 0, sizeof(message_reponse));
+
+    while (!permissionJouer) {
+        printf ("C'est votre tour de jouer, vous êtes le joueur %d\n", joueur_id);
+        if (msgrcv(msgid, &message_reponse, MSG_SIZE, joueur_id, 0 ) == -1) {
+            printf ("messgae: %s\n", message_reponse.msg_text);
+            perror("Erreur lors de la réception du message");
+            exit(EXIT_FAILURE);
+        }
+        printf ("Voici le message reçu : %s\n", message_reponse.msg_text);
+        sleep(0.5);
+        if (strcmp(message_reponse.msg_text, "a toi") == 0) {
+            printf("C'est à toi de jouer !\n");
+
+            // Envoyer une confirmation au serveur
+            message_reponse.msg_type = joueur_id;
+            strcpy(message_reponse.msg_text, "pret");
+            if (msgsnd(msgid, &message_reponse, strlen(message_reponse.msg_text) + 1, 0) == -1) {
+                perror("Erreur lors de l'envoi de la confirmation");
+                exit(EXIT_FAILURE);
+            }
+
+            permissionJouer = true;
+        }
+        else printf ("Jeu en cours: %s\n", message_reponse.msg_text);
+    }
+
+    if (msgrcv(msgid, &message_reponse, MSG_SIZE, joueur_id, 0) == -1) {
+        perror("Erreur lors de la réception du jeu initial");
+        exit(EXIT_FAILURE);
+    }
+    sleep(0.5);
+
+    printf("Voici votre jeu :\n%s\n", message_reponse.msg_text);
+
+    while (!carte_valide) {
+        carte_choisie = 0;
+        while (carte_choisie <= 0 || carte_choisie > 18) {
+            printf("Choisissez une carte à jouer (1-%d) : ", 18); // Ajustez 24 à la taille réelle si nécessaire
+            scanf("%d", &carte_choisie);
+        }
+        sleep(1);
+
+        message_reponse.msg_type = joueur_id;
+        snprintf(message_reponse.msg_text, MSG_SIZE, "%d", carte_choisie);
+
+        if (msgsnd(msgid, &message_reponse, strlen(message_reponse.msg_text) + 1, 0) == -1) {
+            perror("Erreur lors de l'envoi de l'index de la carte");
+            exit(EXIT_FAILURE);
+        }
+        sleep(1);
+
+        if (msgrcv(msgid, &message_reponse, MSG_SIZE, joueur_id, 0) == -1) {
+            perror("Erreur lors de la réception de la validation");
+            exit(EXIT_FAILURE);
+        }
+
+        if (strcmp(message_reponse.msg_text, "valide") == 0) {
+            carte_valide = true;
+            printf("Carte jouée avec succès.\n");
+        } else {
+            printf("Carte invalide. Réessayez.\n");
+        }
+    }
+
+    printf("Jeu mis à jour :\n");
+    if (msgrcv(msgid, &message_reponse, MSG_SIZE, joueur_id, 0) == -1) {
+        perror("Erreur lors de la réception du jeu mis à jour");
+        exit(EXIT_FAILURE);
+    }
+    printf("%s", message_reponse.msg_text);
 }
 
 
@@ -212,6 +291,10 @@ int main(int argc, char *argv[]) {
     montrer_chien(msgid, client_id);
     if (client_id == preneur) faire_chien_client(msgid, preneur);
     recevoir_message (msgid, client_id);
+    faire_un_tour(msgid, client_id);
+
+
+
     return EXIT_SUCCESS;
 
 }
