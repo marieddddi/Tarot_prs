@@ -14,7 +14,7 @@ void creer_jeu(struct carte jeu[78]){
     int i = 0;
     int j = 0;
     char couleurs[4] = {'C', 'K', 'P', 'T'};  // K = carreau, P = pique, T = trefle, C = coeur
-    char* valeurs[14] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "v", "C", "D", "R"};  // Valeurs sous forme de chaînes de caractères
+    char* valeurs[14] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "V", "C", "D", "R"};  // Valeurs sous forme de chaînes de caractères
     float points[14] = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.5, 2.5, 3.5, 4.5};  // Points associés à chaque valeur
     char* atouts[22] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "*"}; // '*' = excuse
     float points_atouts[22] = {4.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 4.5, 4.5};  // Points associés à chaque atout
@@ -69,6 +69,20 @@ int valeur_en_int(const char *valeur) {
     return atoi(valeur);
 }
 
+int valeur_en_index(const char *valeur) {
+    const char *ordre[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "V", "C", "D", "R"};
+    int taille = sizeof(ordre) / sizeof(ordre[0]);
+
+    for (int i = 0; i < taille; i++) {
+        if (strcmp(valeur, ordre[i]) == 0) {
+            return i; // Retourne l'index correspondant à la valeur
+        }
+    }
+
+    return -1; // Retourne -1 si la valeur n'est pas valide
+}
+
+
 bool accepter_carte(struct carte *carteLaplusForte, struct carte *carteActuelle, struct paquet *paquet, char couleurJouee){
     //si precedent nul accepte
     if (carteLaplusForte->couleur == 0){
@@ -113,6 +127,12 @@ bool accepter_carte(struct carte *carteLaplusForte, struct carte *carteActuelle,
 
 //fonction pour savoir qui a la plus forte carte
 int qui_a_la_plus_forte_carte(struct carte *carteLaPlusForte, struct carte *carteActuelle, char couleurJouee) {
+    int valeurActuelle = valeur_en_index(carteActuelle->valeur);
+    int valeurForte = valeur_en_index(carteLaPlusForte->valeur);
+
+    int valeurActuelleAtout = valeur_en_int(carteActuelle->valeur);
+    int valeurForteAtout = valeur_en_int(carteLaPlusForte->valeur);
+    
     //si precedent nul accepte
     if (carteLaPlusForte->couleur == 0) {
         return 1;
@@ -122,11 +142,22 @@ int qui_a_la_plus_forte_carte(struct carte *carteLaPlusForte, struct carte *cart
     }
     //si c'est la bonne couleur, on regarde qui a la plus forte carte (selon la valeur)
     if (carteActuelle->couleur== couleurJouee &&
-        atoi(carteActuelle->valeur) > atoi(carteLaPlusForte->valeur) &&
+        !est_atout(carteLaPlusForte) && 
+        !est_atout(carteActuelle) &&
+        valeurActuelle > valeurForte &&
         carteLaPlusForte->couleur==couleurJouee) {
         return 1;
     }
-    if (carteActuelle->couleur==couleurJouee && carteActuelle->valeur < carteLaPlusForte->valeur && carteLaPlusForte->couleur==couleurJouee){
+
+    if (carteActuelle->couleur== couleurJouee &&
+        est_atout(carteLaPlusForte) && 
+        est_atout(carteActuelle) &&
+        valeurActuelleAtout > valeurForteAtout &&
+        carteLaPlusForte->couleur==couleurJouee) {
+        return 1;
+    }
+
+    if (!est_atout(carteLaPlusForte) && !est_atout(carteActuelle) && carteActuelle->couleur==couleurJouee && valeurActuelle <valeurForte && carteLaPlusForte->couleur==couleurJouee){
         return 0;
     }
     //si on joue un atout, on gagne

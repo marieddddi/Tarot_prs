@@ -408,14 +408,23 @@ void mettreAJourOrdreJoueurs(int ordre_joueurs[], int JoueurQuiPrend) {
     int nouvel_ordre[MAX_CLIENTS];
     int index = 0;
 
-    // Ajouter JoueurQuiPrend en premier
-    nouvel_ordre[index++] = JoueurQuiPrend;
-
-    // Ajouter les autres joueurs dans l'ordre cyclique
+    // Trouver la position actuelle du joueur qui prend
+    int position = -1;
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (ordre_joueurs[i] != JoueurQuiPrend) {
-            nouvel_ordre[index++] = ordre_joueurs[i];
+        if (ordre_joueurs[i] == JoueurQuiPrend) {
+            position = i;
+            break;
         }
+    }
+
+    if (position == -1) {
+        printf("Erreur : JoueurQuiPrend non trouvé dans l'ordre actuel\n");
+        return;
+    }
+
+    // Remplir le nouvel ordre à partir de la position trouvée
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        nouvel_ordre[i] = ordre_joueurs[(position + i) % MAX_CLIENTS];
     }
 
     // Copier le nouvel ordre dans ordre_joueurs
@@ -426,98 +435,108 @@ void mettreAJourOrdreJoueurs(int ordre_joueurs[], int JoueurQuiPrend) {
 
 void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *paquet_preneur, int preneur, int ordre[MAX_CLIENTS]) {
     struct msg_buffer message;
-    int index = 0;
-    bool carte_valide = false;
-    struct carte carteLaPlusForte = { 0, {0,0}, 0.0 };
-    char couleurJouee = ' ';
-    int joueurQuiPrendEnsuite = 0;
     char *aToi = "a toi";
-    int premierJoueur = 0;
+    int index = 0;
 
-    struct paquet paquet_en_cours = {0};
+    while (joueur1.nb_cartes>0){
+        bool carte_valide = false;
+        struct carte carteLaPlusForte = { 0, {0,0}, 0.0 };
+        char couleurJouee = ' ';
+        int joueurQuiPrendEnsuite = 0;
+        int premierJoueur = 0;
 
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        int joueur = ordre[i];
-        printf("Tour du joueur %d\n", joueur);
+        struct paquet paquet_en_cours = {0};
 
-        message.msg_type = joueur;
-        strncpy(message.msg_text, aToi, MSG_SIZE - 1);
-        message.msg_text[MSG_SIZE - 1] = '\0'; 
 
-        if (msgsnd(msgid, &message, sizeof(message.msg_text), 0) == -1) {
-            perror("Pb envoie");
-            exit(EXIT_FAILURE);
-        }
-        sleep(2);
-        memset (&message, 0, sizeof(message));
-        if (msgrcv(msgid, &message, sizeof(message.msg_text), joueur, 0) == -1) {
-            perror("Erreur lors de la réception de l'accusé de réception du joueur");
-            exit(EXIT_FAILURE);
-        }
-        if (strcmp(message.msg_text, "pret") != 0) {
-            fprintf(stderr, "Le joueur %d n'a pas confirmé qu'il est prêt.\n", joueur);
-            exit(EXIT_FAILURE);
-        }
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            int joueur = ordre[i];
+            printf("Tour du joueur %d\n", joueur);
 
-        sleep(2);
-        envoyer_jeu(msgid, joueurs[joueur - 1], joueur);
-        sleep(2);
+            message.msg_type = joueur;
+            strncpy(message.msg_text, aToi, MSG_SIZE - 1);
+            message.msg_text[MSG_SIZE - 1] = '\0'; 
 
-        while (!carte_valide) {
-            if (msgrcv(msgid, &message, MSG_SIZE, joueur, 0) == -1) {
-                perror("Erreur lors de la réception de la carte");
+            if (msgsnd(msgid, &message, sizeof(message.msg_text), 0) == -1) {
+                perror("Pb envoie");
                 exit(EXIT_FAILURE);
             }
             sleep(2);
-            index = atoi(message.msg_text) - 1;
-
-            carte_valide = accepter_carte(&carteLaPlusForte, &joueurs[joueur - 1]->jeu[index], joueurs[joueur - 1], couleurJouee);
-            strcpy(message.msg_text, carte_valide ? "valide" : "non_valide");
-            message.msg_type = joueur;
-            if (msgsnd(msgid, &message, strlen(message.msg_text) + 1, 0) == -1) {
-                perror("Erreur lors de l'envoi de la validation");
+            memset (&message, 0, sizeof(message));
+            if (msgrcv(msgid, &message, sizeof(message.msg_text), joueur, 0) == -1) {
+                perror("Erreur lors de la réception de l'accusé de réception du joueur");
                 exit(EXIT_FAILURE);
             }
+            if (strcmp(message.msg_text, "pret") != 0) {
+                printf ("mess: %s\n", message.msg_text);
+                fprintf(stderr, "Le joueur %d n'a pas confirmé qu'il est prêt.\n", joueur);
+                exit(EXIT_FAILURE);
+            }
+
+            sleep(2);
+            envoyer_jeu(msgid, joueurs[joueur - 1], joueur);
+            sleep(2);
+
+            while (!carte_valide) {
+                if (msgrcv(msgid, &message, MSG_SIZE, joueur, 0) == -1) {
+                    perror("Erreur lors de la réception de la carte");
+                    exit(EXIT_FAILURE);
+                }
+                sleep(2);
+                index = atoi(message.msg_text) - 1;
+
+                carte_valide = accepter_carte(&carteLaPlusForte, &joueurs[joueur - 1]->jeu[index], joueurs[joueur - 1], couleurJouee);
+                strcpy(message.msg_text, carte_valide ? "valide" : "non_valide");
+                message.msg_type = joueur;
+                if (msgsnd(msgid, &message, strlen(message.msg_text) + 1, 0) == -1) {
+                    perror("Erreur lors de l'envoi de la validation");
+                    exit(EXIT_FAILURE);
+                }
+            }
+
+            struct carte carte_jouee = joueurs[joueur - 1]->jeu[index];
+            ajouter_carte(&paquet_en_cours, &carte_jouee);
+            //on affiche le paquet en cours 
+            printf("paquet en cours: \n");
+            afficher_paquet (&paquet_en_cours);
+            retirer_carte(joueurs[joueur - 1], index);
+
+            if (strcmp(carte_jouee.valeur, "*")==0 && joueur != preneur) {
+                ajouter_carte(paquet_adversaires, &carte_jouee);
+            } 
+            if (strcmp(carte_jouee.valeur,"*")==0 && joueur == preneur) {
+                ajouter_carte(paquet_preneur, &carte_jouee);
+            }
+            if (qui_a_la_plus_forte_carte(&carteLaPlusForte, &carte_jouee, couleurJouee) == 1 && strcmp(carte_jouee.valeur,"*")!=0) {
+                joueurQuiPrendEnsuite = joueur;
+                carteLaPlusForte = carte_jouee;
+                //on modifie la couleur jouee, c'est celle du premier joueur qui a joué
+                if (premierJoueur == 0) {
+                    couleurJouee = carte_jouee.couleur;
+                    premierJoueur = 1;
+                }
+            }
+            printf("envoie du jeu aux joueurs\n");
+            envoyer_jeu_joueurs(msgid, &paquet_en_cours);
+            carte_valide = false;
         }
 
-        struct carte carte_jouee = joueurs[joueur - 1]->jeu[index];
-        ajouter_carte(&paquet_en_cours, &carte_jouee);
-        //on affiche le paquet en cours 
-        printf("paquet en cours: \n");
-        afficher_paquet (&paquet_en_cours);
-        retirer_carte(joueurs[joueur - 1], index);
-
-        if (strcmp(carte_jouee.valeur, "*")==0 && joueur != preneur) {
-            ajouter_carte(paquet_adversaires, &carte_jouee);
-        } 
-        if (strcmp(carte_jouee.valeur,"*")==0 && joueur == preneur) {
-            ajouter_carte(paquet_preneur, &carte_jouee);
-        }
-        if (qui_a_la_plus_forte_carte(&carteLaPlusForte, &carte_jouee, couleurJouee) == 1 && strcmp(carte_jouee.valeur,"*")!=0) {
-            joueurQuiPrendEnsuite = joueur;
-            carteLaPlusForte = carte_jouee;
-            //on modifie la couleur jouee, c'est celle du premier joueur qui a joué
-            if (premierJoueur == 0) {
-                couleurJouee = carte_jouee.couleur;
-                premierJoueur = 1;
+        if (joueurQuiPrendEnsuite == preneur) {
+            for (int i = 0; i < paquet_en_cours.nb_cartes; i++) {
+                ajouter_carte(paquet_preneur, &paquet_en_cours.jeu[i]);
+            }
+        } else {
+            for (int i = 0; i < paquet_en_cours.nb_cartes; i++) {
+                ajouter_carte(paquet_adversaires, &paquet_en_cours.jeu[i]);
             }
         }
-        printf("envoie du jeu aux joueurs\n");
-        envoyer_jeu_joueurs(msgid, &paquet_en_cours);
-        carte_valide = false;
-    }
-
-    if (joueurQuiPrendEnsuite == preneur) {
-        for (int i = 0; i < paquet_en_cours.nb_cartes; i++) {
-            ajouter_carte(paquet_preneur, &paquet_en_cours.jeu[i]);
-        }
-    } else {
-        for (int i = 0; i < paquet_en_cours.nb_cartes; i++) {
-            ajouter_carte(paquet_adversaires, &paquet_en_cours.jeu[i]);
+        printf("joueur qui prend ensuite : %d\n", joueurQuiPrendEnsuite);
+        
+        mettreAJourOrdreJoueurs(ordre, joueurQuiPrendEnsuite);
+        printf ("ordre des joueurs : \n");
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            printf("%d ", ordre[i]);
         }
     }
-    
-    mettreAJourOrdreJoueurs(ordre, joueurQuiPrendEnsuite);
 }
 
 
