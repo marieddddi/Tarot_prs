@@ -9,15 +9,15 @@
 
 #define MSG_KEY 1234
 #define MAX_CLIENTS 4
-#define MSG_SIZE 2048
+#define MSG_SIZE 1024
 
 struct msg_buffer {
     long msg_type;
     char msg_text[MSG_SIZE];
 };
 
-struct paquet chien, j1, j2, j3, j4, paquet_preneur, paquet_adversaires;
-struct paquet *joueurs[] = {&j1, &j2, &j3, &j4};
+struct paquet chien, joueur1, joueur2, joueur3, joueur4, paquet_preneur, paquet_adversaires;
+struct paquet *joueurs[] = {&joueur1, &joueur2, &joueur3, &joueur4};
 
 
 void afficher_nombre_messages(int msgid) {
@@ -65,7 +65,7 @@ void attendre_clients(int msgid) {
 }
 
 void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
-    distribuer_cartes(jeu, &j1, &j2, &j3, &j4, &chien);
+    distribuer_cartes(jeu, &joueur1, &joueur2, &joueur3, &joueur4, &chien);
 
     struct msg_buffer message;
 
@@ -90,6 +90,7 @@ void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
             exit(EXIT_FAILURE);
         }
         printf("Cartes envoyées au joueur %d.\n", i + 1);
+        printf ("%s\n", message.msg_text);
 
         if (msgrcv(msgid, &message, MSG_SIZE, i + 1, 0) == -1) {
             perror("Erreur lors de la réception de la confirmation de réception des cartes");
@@ -210,9 +211,7 @@ void envoyer_jeu(int msgid, struct paquet *paquet, int preneur) {
     }
 
     message.msg_type = preneur;
-    printf ("Envoi du jeu au preneur %d\n", preneur);
-    //affiche le jeu
-    printf("%s", buffer);
+    printf ("Envoi du jeu au joueur %d\n", preneur);
     strncpy(message.msg_text, buffer, MSG_SIZE - 1);
     message.msg_text[MSG_SIZE - 1] = '\0';
 
@@ -429,10 +428,11 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
     struct msg_buffer message;
     int index = 0;
     bool carte_valide = false;
-    struct carte carteLaPlusForte = {0, 0, 0};
+    struct carte carteLaPlusForte = { 0, {0,0}, 0.0 };
     char couleurJouee = ' ';
     int joueurQuiPrendEnsuite = 0;
     char *aToi = "a toi";
+    int premierJoueur = 0;
 
     struct paquet paquet_en_cours = {0};
 
@@ -444,16 +444,13 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
         strncpy(message.msg_text, aToi, MSG_SIZE - 1);
         message.msg_text[MSG_SIZE - 1] = '\0'; 
 
-        if (msgsnd(msgid, &message, sizeof(message.msg_text)+1, 0) == -1) {
+        if (msgsnd(msgid, &message, sizeof(message.msg_text), 0) == -1) {
             perror("Pb envoie");
             exit(EXIT_FAILURE);
         }
-        printf ("Message envoyé au joueur %d\n", joueur);
-        printf ("Texte: %s\n", message.msg_text);
         sleep(2);
-
-        if (msgrcv(msgid, &message, MSG_SIZE, joueur, 0) == -1) {
-            printf ('joueur: %d\n', joueur);
+        memset (&message, 0, sizeof(message));
+        if (msgrcv(msgid, &message, sizeof(message.msg_text), joueur, 0) == -1) {
             perror("Erreur lors de la réception de l'accusé de réception du joueur");
             exit(EXIT_FAILURE);
         }
@@ -471,13 +468,10 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
                 perror("Erreur lors de la réception de la carte");
                 exit(EXIT_FAILURE);
             }
-
-            printf("Carte choisie par le joueur %d : %s\n", joueur, message.msg_text);
             sleep(2);
             index = atoi(message.msg_text) - 1;
 
             carte_valide = accepter_carte(&carteLaPlusForte, &joueurs[joueur - 1]->jeu[index], joueurs[joueur - 1], couleurJouee);
-
             strcpy(message.msg_text, carte_valide ? "valide" : "non_valide");
             message.msg_type = joueur;
             if (msgsnd(msgid, &message, strlen(message.msg_text) + 1, 0) == -1) {
@@ -488,19 +482,27 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
 
         struct carte carte_jouee = joueurs[joueur - 1]->jeu[index];
         ajouter_carte(&paquet_en_cours, &carte_jouee);
+        //on affiche le paquet en cours 
+        printf("paquet en cours: \n");
+        afficher_paquet (&paquet_en_cours);
         retirer_carte(joueurs[joueur - 1], index);
 
-        if (carte_jouee.valeur == '*' && joueur != preneur) {
+        if (strcmp(carte_jouee.valeur, "*")==0 && joueur != preneur) {
             ajouter_carte(paquet_adversaires, &carte_jouee);
-        } else if (carte_jouee.valeur == '*' && joueur == preneur) {
+        } 
+        if (strcmp(carte_jouee.valeur,"*")==0 && joueur == preneur) {
             ajouter_carte(paquet_preneur, &carte_jouee);
         }
-
-        if (qui_a_la_plus_forte_carte(&carteLaPlusForte, &carte_jouee, couleurJouee) == 1) {
+        if (qui_a_la_plus_forte_carte(&carteLaPlusForte, &carte_jouee, couleurJouee) == 1 && strcmp(carte_jouee.valeur,"*")!=0) {
             joueurQuiPrendEnsuite = joueur;
             carteLaPlusForte = carte_jouee;
+            //on modifie la couleur jouee, c'est celle du premier joueur qui a joué
+            if (premierJoueur == 0) {
+                couleurJouee = carte_jouee.couleur;
+                premierJoueur = 1;
+            }
         }
-
+        printf("envoie du jeu aux joueurs\n");
         envoyer_jeu_joueurs(msgid, &paquet_en_cours);
         carte_valide = false;
     }
@@ -514,7 +516,7 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
             ajouter_carte(paquet_adversaires, &paquet_en_cours.jeu[i]);
         }
     }
-
+    
     mettreAJourOrdreJoueurs(ordre, joueurQuiPrendEnsuite);
 }
 
@@ -523,6 +525,9 @@ int main() {
     int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
     //on init le nb de cartes de paquet_prneeur;
     paquet_preneur.nb_cartes = 0;
+    int preneur = 0;
+
+    int ordre_joueurs[MAX_CLIENTS] = {1, 2, 3, 4};
 
     if (msgid == -1) {
         perror("Erreur lors de la création de la file de messages");
@@ -537,10 +542,11 @@ int main() {
     attendre_clients(msgid);
 
     printf("Tous les joueurs sont prêts. Distribution des cartes...\n");
-    distribuer_cartes_aux_clients(msgid, &jeu);
+    while (preneur == 0){
+        distribuer_cartes_aux_clients(msgid, &jeu);
 
-    int ordre_joueurs[MAX_CLIENTS] = {1, 2, 3, 4};
-    int preneur = demande_contrat(msgid, ordre_joueurs, MAX_CLIENTS);
+        preneur = demande_contrat(msgid, ordre_joueurs, MAX_CLIENTS);
+    }
 
     printf("Le preneur est le joueur %d.\n", preneur);
 

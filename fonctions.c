@@ -64,48 +64,47 @@ bool possede_couleur(struct paquet *p, char couleur){
     return false;
 }
 
+int valeur_en_int(const char *valeur) {
+    // Convertit une chaîne de caractères en entier
+    return atoi(valeur);
+}
+
 bool accepter_carte(struct carte *carteLaplusForte, struct carte *carteActuelle, struct paquet *paquet, char couleurJouee){
     //si precedent nul accepte
-    if (carteLaplusForte->valeur[0] == 0){
+    if (carteLaplusForte->couleur == 0){
         printf ("Carte precedente nulle\n");
         return true;
     }
+    if (strcmp(carteActuelle->valeur, "*")==0) return true;
     //si couleur identique et que ce n'est pas un atout on accepte
     if (! est_atout(carteActuelle) && est_meme_couleur(carteActuelle, couleurJouee)){
-        printf ("Couleur identique\n");
         return true;
     }
 
     //si on a pas de carte de la meme couleur et que c'est un atout
     if (!est_atout(carteLaplusForte) && !possede_couleur(paquet, couleurJouee) && est_atout(carteActuelle)){
-        printf ("Atout\n");
         return true;
     }
 
     //si on a pas de carte de la meme couleur et qu'on a pas d'atout
     if (! possede_couleur(paquet, carteLaplusForte->couleur) && ! possede_couleur(paquet, ' ')){
-        printf ("Pas de couleur et pas d'atout\n");
         return true;
     }
 
     // si on a un atout et que la carte actuelle est un atout, on regarde bien que la carte actuelle est plus forte
     if (est_atout(carteLaplusForte) && est_atout(carteActuelle)){
         //on affiche la carte precedente et la carte actuelle
-        printf ("Atout\n");
-        printf ("Carte precedente: %c %s %f\n", carteLaplusForte->couleur, carteLaplusForte->valeur, carteLaplusForte->point);
-        printf ("Carte actuelle: %c %s %f\n", carteActuelle->couleur, carteActuelle->valeur, carteActuelle->point);
-        if (carteActuelle->valeur[0] > carteLaplusForte->valeur[0]){
-            printf ("Atout plus fort\n");
+        int valeurActuelle = valeur_en_int(carteActuelle->valeur);
+        int valeurForte = valeur_en_int(carteLaplusForte->valeur);
+        if (valeurActuelle > valeurForte){
             return true;
         }
         //si on peut mettre qu'un atout plus faible
         for (int i = 0; i < paquet->nb_cartes; i++){
-            if (est_atout(&paquet->jeu[i]) && paquet->jeu[i].valeur[0] > carteLaplusForte->valeur[0]){
-                printf ("Atout plus fort\n");
+            if (est_atout(&paquet->jeu[i]) && valeur_en_int(paquet->jeu[i].valeur) > valeurForte){
                 return false;
             }
         }
-        printf ("Atout plus faible pas le choix\n");
         return true;
     }
     printf ("Vous ne pouvez pas jouer cette carte\n");
@@ -115,29 +114,34 @@ bool accepter_carte(struct carte *carteLaplusForte, struct carte *carteActuelle,
 //fonction pour savoir qui a la plus forte carte
 int qui_a_la_plus_forte_carte(struct carte *carteLaPlusForte, struct carte *carteActuelle, char couleurJouee) {
     //si precedent nul accepte
-    if (carteLaPlusForte->valeur[0] == 0){
+    if (carteLaPlusForte->couleur == 0) {
         return 1;
     }
-    if (carteActuelle->valeur == '*'){
+    if (strcmp(carteActuelle->valeur,"*")==0){
         return 0;
     }
     //si c'est la bonne couleur, on regarde qui a la plus forte carte (selon la valeur)
-    if (carteActuelle == couleurJouee && carteActuelle->valeur[0] > carteLaPlusForte->valeur[0] && carteLaPlusForte->couleur == couleurJouee){
+    if (carteActuelle->couleur== couleurJouee &&
+        atoi(carteActuelle->valeur) > atoi(carteLaPlusForte->valeur) &&
+        carteLaPlusForte->couleur==couleurJouee) {
         return 1;
     }
-    if (carteActuelle == couleurJouee && carteActuelle->valeur[0] < carteLaPlusForte->valeur[0] && carteLaPlusForte->couleur == couleurJouee){
+    if (carteActuelle->couleur==couleurJouee && carteActuelle->valeur < carteLaPlusForte->valeur && carteLaPlusForte->couleur==couleurJouee){
         return 0;
     }
     //si on joue un atout, on gagne
     if (est_atout(carteActuelle) && !est_atout(carteLaPlusForte)) {
         return 1;
-    }
+    }/*
     if (est_atout(carteLaPlusForte) && !est_atout(carteActuelle)) {
+        printf ("atout\n");
         return 0;
     }
     if (!est_atout (carteActuelle) && carteActuelle->couleur != couleurJouee){
+        printf ("la ?\n");
         return 0;
-    }
+    }*/
+    return 0;
 }
 
 
@@ -169,7 +173,7 @@ float score(struct paquet *paquet){
     int nb_bout = 0;
     float nb_points = 0;
     for (int i = 0; i < paquet->nb_cartes; i++){
-        if ((paquet->jeu[i].valeur[0] == '1' && paquet->jeu[i].couleur == ' ') || (paquet->jeu[i].valeur[0] == '21' && paquet->jeu[i].couleur == ' ') || (paquet->jeu[i].valeur[0] == '*' && paquet->jeu[i].couleur == ' ')){
+        if ((strcmp(paquet->jeu[i].valeur,"1")==0 && paquet->jeu[i].couleur==' ') || (strcmp(paquet->jeu[i].valeur,"21")==0 && paquet->jeu[i].couleur==' ') || (strcmp(paquet->jeu[i].valeur,"*")==0 && paquet->jeu[i].couleur==' ')){
             nb_bout += 1;
         }
     }
@@ -194,7 +198,7 @@ float score(struct paquet *paquet){
     return calculer_points(paquet) - nb_points;
 }
 
-float score_final(struct paquet *paquet, char choix_contrat, bool preneur){
+float score_final(struct paquet *paquet, char *choix_contrat, bool preneur){
     if (score(paquet) >= 0){
         if (preneur) return (25 + score(paquet)) * contrat(choix_contrat)*3;
         else return -(25 + score(paquet)) * contrat(choix_contrat);
