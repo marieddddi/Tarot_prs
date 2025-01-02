@@ -5,11 +5,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/shm.h>
 #include "fonctions.h"
 
 #define MSG_KEY 1234
 #define MAX_CLIENTS 4
 #define MSG_SIZE 1024
+#define SHM_KEY 5678
 
 struct msg_buffer {
     long msg_type;
@@ -18,6 +20,10 @@ struct msg_buffer {
 
 struct paquet chien, joueur1, joueur2, joueur3, joueur4, paquet_preneur, paquet_adversaires;
 struct paquet *joueurs[] = {&joueur1, &joueur2, &joueur3, &joueur4};
+char *contrat_final = 0;
+
+//score des joueurs sous forme de tableau
+float scoreJoueurs[] = {0.0, 0.0, 0.0, 0.0};
 
 
 void afficher_nombre_messages(int msgid) {
@@ -183,6 +189,11 @@ int demande_contrat(int msgid, int ordre_joueurs[], int nb_joueurs) {
         printf("Aucun preneur trouvé.\n");
     } else {
         printf("Le preneur est le joueur %d avec un contrat de niveau %d\n", preneur, niveau_max);
+        //on stock le contrat 
+        contrat_final = malloc(strlen(contrats_joueurs[preneur]) + 1);
+        printf("contrat: %s\n", contrats_joueurs[preneur]);
+        //on stock le contrat dans contrat_final
+        strcpy(contrat_final, contrats_joueurs[preneur]);
     }
 
     for (int i = 1; i < nb_joueurs + 1; i++) {
@@ -245,7 +256,6 @@ void envoyer_jeu_joueurs (int msgid, struct paquet *paquet) {
     }
     printf("jeu envoyé à tous les joueurs.\n");
 }
-
 
 void montrer_chien(int msgid, struct paquet *chien) {
     struct msg_buffer message;
@@ -438,7 +448,7 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
     char *aToi = "a toi";
     int index = 0;
 
-    while (joueur1.nb_cartes>0){
+    while (joueur1.nb_cartes>17){
         bool carte_valide = false;
         struct carte carteLaPlusForte = { 0, {0,0}, 0.0 };
         char couleurJouee = ' ';
@@ -522,10 +532,13 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
 
         if (joueurQuiPrendEnsuite == preneur) {
             for (int i = 0; i < paquet_en_cours.nb_cartes; i++) {
+                //on ajoute pas l'excuse une seconde fois
+                if (strcmp(paquet_en_cours.jeu[i].valeur,"*")!=0)
                 ajouter_carte(paquet_preneur, &paquet_en_cours.jeu[i]);
             }
         } else {
             for (int i = 0; i < paquet_en_cours.nb_cartes; i++) {
+                if (strcmp(paquet_en_cours.jeu[i].valeur,"*")!=0)
                 ajouter_carte(paquet_adversaires, &paquet_en_cours.jeu[i]);
             }
         }
@@ -539,14 +552,92 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
     }
 }
 
+void mettre_a_jour_scores(float *scores, int joueur, float valeur) {
+    scores[joueur] += valeur;
+    printf("Score mis à jour : Joueur %d -> %.2f\n", joueur + 1, scores[joueur]);
+}
+
+void score_final_joueurs (struct paquet *paquet_preneur, char *contrat_final, int preneur ) {
+    float scorePreneur = score_final(paquet_preneur, contrat_final);
+    //on affiche le score de chacun des joueurs et on les stocks
+    if (scorePreneur > 0.0){
+        //score des adversaires negatif
+        float score_adversaires = -scorePreneur;
+        float score_preneur = scorePreneur*3;
+        for (int i = 1; i < MAX_CLIENTS+1; i++) {
+            if (i==preneur){
+                scoreJoueurs[i-1] += score_preneur;
+                printf("vous avez un score de %f\n", score_preneur);
+            }
+            else{
+                scoreJoueurs[i-1] += score_adversaires;
+                printf("vous avez un score de %f\n", score_adversaires);
+            }
+        }
+    }
+    else{
+        //score des adversaires positif
+        float score_adversaires = -scorePreneur;
+        float score_preneur = scorePreneur*3;
+        for (int i = 1; i < MAX_CLIENTS+1; i++) {
+            if (i==preneur){
+                scoreJoueurs[i-1] += score_preneur;
+                printf("vous avez un score de %f\n", score_preneur);
+            }
+            else{
+                scoreJoueurs[i-1] += score_adversaires;
+                printf("vous avez un score de %f\n", score_adversaires);
+            }
+        }
+    }
+}
+
+bool continuer_de_jouer(int msgid) {
+    struct msg_buffer message;
+    char *demande = "Voulez-vous continuer ? (oui/non)";
+    bool continuer = true;
+
+    // Envoyer la demande à tous les clients
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        message.msg_type = i + 1;
+        strncpy(message.msg_text, demande, MSG_SIZE - 1);
+        message.msg_text[MSG_SIZE - 1] = '\0';
+        printf ("Envoi de la demande au client %d\n", i + 1);
+        if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1) {
+            perror("Erreur lors de l'envoi de la demande de continuation");
+            exit(EXIT_FAILURE);
+        }
+        sleep(2);
+    }
+
+    // Recevoir les réponses des clients
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        printf ("En attente de la réponse du client %d...\n", i + 1);
+        if (msgrcv(msgid, &message, MSG_SIZE, i + 1, 0) == -1) {
+            perror("Erreur lors de la réception de la réponse");
+            exit(EXIT_FAILURE);
+        }
+        sleep(0.5);
+
+        if (strcmp(message.msg_text, "non") == 0) {
+            continuer = false;
+        }
+    }
+
+    return continuer;
+}
+
 
 int main() {
     int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
-    //on init le nb de cartes de paquet_prneeur;
-    paquet_preneur.nb_cartes = 0;
-    int preneur = 0;
-
-    int ordre_joueurs[MAX_CLIENTS] = {1, 2, 3, 4};
+    int preneur;
+    int ordre_joueurs[MAX_CLIENTS] ;
+    struct paquet jeu;
+    char *message2 = "Le jeu est terminé !";
+    char *message = "Le chien est fait ! Commencons à jouer !";
+    char *messageContinuJouer = "Pret pour une partie ...";
+    char *messageFinJeu = "fin du jeu, merci !";
+    bool continue_jouer = true;
 
     if (msgid == -1) {
         perror("Erreur lors de la création de la file de messages");
@@ -554,35 +645,93 @@ int main() {
     }
     printf("File de messages créée avec la clé %d\n", MSG_KEY);
 
-    struct paquet jeu;
-    creer_paquet(&jeu);
+    // Création de la mémoire partagée pour les scores
+    int shmid = shmget(SHM_KEY, MAX_CLIENTS * sizeof(float), IPC_CREAT | 0666);
+    if (shmid == -1) {
+        perror("Erreur lors de la création de la mémoire partagée");
+        exit(EXIT_FAILURE);
+    }
+
+    float *scores = (float *)shmat(shmid, NULL, 0);
+    if (scores == (void *)-1) {
+        perror("Erreur lors de l'attachement à la mémoire partagée");
+        exit(EXIT_FAILURE);
+    }
+
+    // Initialisation des scores
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        scores[i] = 0.0;
+    }
 
     printf("Attente des joueurs...\n");
     attendre_clients(msgid);
 
-    printf("Tous les joueurs sont prêts. Distribution des cartes...\n");
-    while (preneur == 0){
-        distribuer_cartes_aux_clients(msgid, &jeu);
+    while(continue_jouer){
+        //on init le nb de cartes de paquet_prneeur;
+        paquet_preneur.nb_cartes = 0;
+        preneur = 0;
 
-        preneur = demande_contrat(msgid, ordre_joueurs, MAX_CLIENTS);
+        // Initialisation de l'ordre des joueurs
+        ordre_joueurs[0] = 1;
+        ordre_joueurs[1] = 2;
+        ordre_joueurs[2] = 3;
+        ordre_joueurs[3] = 4;
+
+        char *messageStart = "Nouvelle partie !";
+        envoyer_message(msgid, messageStart);
+
+
+        //jeu
+        creer_paquet(&jeu);
+
+        printf("Tous les joueurs sont prêts. Distribution des cartes...\n");
+        while (preneur == 0){
+            distribuer_cartes_aux_clients(msgid, &jeu);
+
+            preneur = demande_contrat(msgid, ordre_joueurs, MAX_CLIENTS);
+        }
+
+        printf("Le preneur est le joueur %d.\n", preneur);
+
+        printf("Montrons le chien...\n");
+        montrer_chien(msgid, &chien);
+
+        faire_chien (msgid, &chien, preneur, joueurs[preneur-1]);
+
+        //une fois le chien fait, on envoie à chaque que le chien est fait
+        envoyer_message (msgid, message);
+
+        //au debut, c'est le joueur 1 qui joue, ensuite l'ordre sera fait par celui qui prendra le tour
+        //on fait un tour
+        jouer_un_tour(msgid, &paquet_adversaires, &paquet_preneur, preneur, ordre_joueurs);
+        
+        //le jeu est terminé, on envoie à chaque joueur que le jeu est terminé
+        envoyer_message (msgid, message2);
+
+        //scores
+        score_final_joueurs(&paquet_preneur, contrat_final, preneur);
+        for (int i = 0; i < MAX_CLIENTS; i++) {
+            mettre_a_jour_scores (scores, i, scoreJoueurs[i]);
+        }
+
+        //on demande aux joueurs s'ils veulent continuer de jouer.
+        continue_jouer = continuer_de_jouer(msgid);
+
+        if (continue_jouer) envoyer_message(msgid,messageContinuJouer);
+        else envoyer_message(msgid,messageFinJeu);
+    }
+    sleep(2);
+    // Détachement et suppression de la mémoire partagée
+    if (shmdt(scores) == -1) {
+        perror("Erreur lors du détachement de la mémoire partagée");
+    }
+    if (shmctl(shmid, IPC_RMID, NULL) == -1) {
+        perror("Erreur lors de la suppression de la mémoire partagée");
     }
 
-    printf("Le preneur est le joueur %d.\n", preneur);
+    //suppression de la file
+    msgctl(msgid, IPC_RMID, NULL);
 
-    printf("Montrons le chien...\n");
-    montrer_chien(msgid, &chien);
-
-    faire_chien (msgid, &chien, preneur, joueurs[preneur-1]);
-
-    //une fois le chien fait, on envoie à chaque que le chien est fait
-    char *message = "Le chien est fait ! Commencons à jouer !";
-    envoyer_message (msgid, message);
-
-    //au debut, c'est le joueur 1 qui joue, ensuite l'ordre sera fait par celui qui prendra le tour
-    //on fait un tour
-    jouer_un_tour(msgid, &paquet_adversaires, &paquet_preneur, preneur, ordre_joueurs);
-                    
-    // msgctl(msgid, IPC_RMID, NULL);
     printf("Serveur terminé.\n");
     return 0;
 }

@@ -82,7 +82,6 @@ int valeur_en_index(const char *valeur) {
     return -1; // Retourne -1 si la valeur n'est pas valide
 }
 
-
 bool accepter_carte(struct carte *carteLaplusForte, struct carte *carteActuelle, struct paquet *paquet, char couleurJouee){
     //si precedent nul accepte
     if (carteLaplusForte->couleur == 0){
@@ -175,11 +174,11 @@ int qui_a_la_plus_forte_carte(struct carte *carteLaPlusForte, struct carte *cart
     return 0;
 }
 
-
 float calculer_points(struct paquet *paquet){
-    float points = 0;
+    float points = 0.0;
     for (int i = 0; i < paquet->nb_cartes; i++){
         points += paquet->jeu[i].point;
+        printf ("points: %f", points);
     }
     return points;
 }
@@ -198,11 +197,10 @@ float contrat (char *choix_contrat){
     return 3; //3 = erreur 
 }
 
-
-//dscore que l'on a fait, on doit voir si on a des bouts dans notre jeu -> a utiliser a la fin de la partie car on peut recuperer des bouts (1)
+//score que l'on a fait, on doit voir si on a des bouts dans notre jeu -> a utiliser a la fin de la partie car on peut recuperer des bouts (1)
 float score(struct paquet *paquet){
     int nb_bout = 0;
-    float nb_points = 0;
+    float nb_points = 0.0;
     for (int i = 0; i < paquet->nb_cartes; i++){
         if ((strcmp(paquet->jeu[i].valeur,"1")==0 && paquet->jeu[i].couleur==' ') || (strcmp(paquet->jeu[i].valeur,"21")==0 && paquet->jeu[i].couleur==' ') || (strcmp(paquet->jeu[i].valeur,"*")==0 && paquet->jeu[i].couleur==' ')){
             nb_bout += 1;
@@ -213,31 +211,24 @@ float score(struct paquet *paquet){
     switch (nb_bout)
     {
     case 1:
-        nb_points = 51;
+        nb_points = 51.0;
         break;
     case 2:
-        nb_points = 41;
+        nb_points = 41.0;
         break;
     case 3:
-        nb_points = 36;
+        nb_points = 36.0;
         break;
     
     default:
-        nb_points = 56;
+        nb_points = 56.0;
         break;
     }
-    return calculer_points(paquet) - nb_points;
+    return (calculer_points(paquet) - nb_points);
 }
 
-float score_final(struct paquet *paquet, char *choix_contrat, bool preneur){
-    if (score(paquet) >= 0){
-        if (preneur) return (25 + score(paquet)) * contrat(choix_contrat)*3;
-        else return -(25 + score(paquet)) * contrat(choix_contrat);
-    }
-    else {
-        if (preneur) return - (25 + score(paquet)) * contrat(choix_contrat)*3;
-        else return (25 + score(paquet)) * contrat(choix_contrat);
-    }
+float score_final(struct paquet *paquet, char *choix_contrat){
+    return (25.0 + score(paquet)) * contrat(choix_contrat);
 }
 
 // Fonction qui permet de distribuer les cartes

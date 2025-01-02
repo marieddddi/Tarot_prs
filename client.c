@@ -7,17 +7,19 @@
 #include <stdio.h>
 #include <string.h>
 #include "fonctions.h"
+#include <sys/shm.h>
 #include <errno.h>
 
 #define MSG_KEY 1234
 #define MSG_SIZE 1024
+#define SHM_KEY 5678
 
 struct msg_buffer {
     long msg_type;
     char msg_text[MSG_SIZE];
 };
 
-void afficher_nombre_messages(int msgid) {
+int afficher_nombre_messages(int msgid) {
     struct msqid_ds buf;
 
     // Récupérer les informations sur la file de messages
@@ -28,6 +30,7 @@ void afficher_nombre_messages(int msgid) {
 
     // Afficher le nombre de messages
     printf("Nombre de messages dans la file : %ld\n", buf.msg_qnum);
+    return buf.msg_qnum;
 }
 
 void joueur_pret(int msgid, int client_id) {
@@ -50,6 +53,67 @@ void recevoir_message (int msgid, int client_id) {
     printf("%s\n", message.msg_text);
     sleep(0.5);
 }
+
+void recevoir_message_fin (int msgid, int client_id) {
+    struct msg_buffer message;
+    while (strcmp (message.msg_text, "Le jeu est terminé !") != 0) {
+        if (msgrcv(msgid, &message, MSG_SIZE, client_id, 0) == -1) {
+            perror("Erreur lors de la réception du message");
+            exit(EXIT_FAILURE);
+        }
+        printf("%s\n", message.msg_text);
+        sleep(0.5);
+    }
+}
+
+bool recevoir_message_jeu (int msgid, int client_id) {
+    struct msg_buffer message;
+    if (msgrcv(msgid, &message, MSG_SIZE, client_id, 0) == -1) {
+        perror("Erreur lors de la réception du message");
+        exit(EXIT_FAILURE);
+    }
+    printf("%s\n", message.msg_text);
+    sleep(0.5);
+    if (strcmp(message.msg_text, "Pret pour une partie ...") == 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+void continuer_jouer(int msgid, int client_id) {
+    struct msg_buffer message;
+    char reponse[10];
+
+    // Recevoir la demande du serveur
+    if (msgrcv(msgid, &message, MSG_SIZE, client_id, 0) == -1) {
+        perror("Erreur lors de la réception de la demande");
+        exit(EXIT_FAILURE);
+    }
+    printf("%s\n", message.msg_text);
+    sleep(0.5);
+
+    // Obtenir la réponse de l'utilisateur
+    do {
+        printf("Répondez (oui/non) : ");
+        if (scanf("%9s", reponse) != 1) {
+            fprintf(stderr, "Erreur de saisie.\n");
+            exit(EXIT_FAILURE);
+        }
+    } while (strcmp(reponse, "oui") != 0 && strcmp(reponse, "non") != 0);
+
+    // Envoyer la réponse au serveur
+    message.msg_type = client_id;
+    strncpy(message.msg_text, reponse, MSG_SIZE - 1);
+    message.msg_text[MSG_SIZE - 1] = '\0';
+
+    if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1) {
+        perror("Erreur lors de l'envoi de la réponse");
+        exit(EXIT_FAILURE);
+    }
+    sleep(1);
+}
+
 
 void recevoir_cartes(int msgid, int client_id) {
     struct msg_buffer message;
@@ -129,7 +193,6 @@ void montrer_chien(int msgid, int client_id) {
     printf("Voici le chien :\n%s\n", message.msg_text);
 }
 
-
 void faire_chien_client(int msgid, int preneur) {
     struct msg_buffer message_reponse;
     bool ok = false;
@@ -191,11 +254,10 @@ void faire_chien_client(int msgid, int preneur) {
     }
 }
 
-
 void faire_un_tour(int msgid, int joueur_id) {
     struct msg_buffer message_reponse;
 
-    for(int i = 18; i > 0 ; i--) { //on doit faire 18 tours car on a tous 18 cartes
+    for(int i = 1; i > 0 ; i--) { //on doit faire 18 tours car on a tous 18 cartes
         bool carte_valide = false;
         bool permissionJouer = false;
         int carte_choisie = 0;
@@ -236,8 +298,8 @@ void faire_un_tour(int msgid, int joueur_id) {
 
         while (!carte_valide) {
             carte_choisie = 0;
-            while (carte_choisie <= 0 || carte_choisie > i) {
-                printf("Choisissez une carte à jouer (1-%d) : ", i); // Ajustez 24 à la taille réelle si nécessaire
+            while (carte_choisie <= 0 || carte_choisie > 18) {
+                printf("Choisissez une carte à jouer (1-%d) : ", 18); // Ajustez 24 à la taille réelle si nécessaire
                 scanf("%d", &carte_choisie);
             }
             sleep(1);
@@ -274,10 +336,35 @@ void faire_un_tour(int msgid, int joueur_id) {
     }
 }
 
+void afficher_scores(float *scores) {
+    printf("Scores des joueurs :\n");
+    for (int i = 0; i < 4; i++) {
+        printf("Joueur %d : %.2f\n", i + 1, scores[i]);
+    }
+}
+
+void vider_file_messages(int msgid) {
+    struct msg_buffer message;
+
+    // Lire tous les messages dans la file et les ignorer
+    while (msgrcv(msgid, &message, MSG_SIZE, 0, IPC_NOWAIT) != -1) {
+        printf("Message supprimé : %s\n", message.msg_text);
+    }
+
+    if (errno != ENOMSG) { // Si l'erreur n'est pas due à une absence de messages
+        perror("Erreur lors de la vidange de la file de messages");
+    } else {
+        printf("File de messages vidée.\n");
+    }
+}
+
 
 
 int main(int argc, char *argv[]) {
-    int preneur = 0;
+    int preneur;
+    bool continu_jeu = true;
+    struct msg_buffer message;
+
     if (argc != 2) {
         printf("Usage: %s <client_id>\n", argv[0]);
         return EXIT_FAILURE;
@@ -290,20 +377,56 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    joueur_pret(msgid, client_id);
-    while (preneur == 0){
-        recevoir_cartes(msgid, client_id);
-        preneur = choix_contrat_client(msgid, client_id);
+    // Connexion à la mémoire partagée pour les scores
+    int shmid = shmget(SHM_KEY, 4 * sizeof(float), 0666);
+    if (shmid == -1) {
+        perror("Erreur lors de la connexion à la mémoire partagée");
+        return EXIT_FAILURE;
     }
-    montrer_chien(msgid, client_id);
-    if (client_id == preneur) faire_chien_client(msgid, preneur);
-    //recevoir_message (msgid, client_id);
-    afficher_nombre_messages (msgid);
-    sleep(2);
-    faire_un_tour(msgid, client_id);
 
+    float *scores = (float *)shmat(shmid, NULL, 0);
+    if (scores == (void *)-1) {
+        perror("Erreur lors de l'attachement à la mémoire partagée");
+        return EXIT_FAILURE;
+    }
 
+    //joueur pret
+    joueur_pret(msgid, client_id);
+
+    while (continu_jeu) {
+        preneur = 0;
+        recevoir_message(msgid, client_id);
+        if (strcmp(message.msg_text, "Nouvelle partie !") == 0) {
+            printf("Début d'une nouvelle partie.\n");
+        }
+
+        //jeu
+        while (preneur == 0){
+            recevoir_cartes(msgid, client_id);
+            preneur = choix_contrat_client(msgid, client_id);
+        }
+        montrer_chien(msgid, client_id);
+        if (client_id == preneur) faire_chien_client(msgid, preneur);
+        sleep(2);
+
+        faire_un_tour(msgid, client_id);
+        
+        //on recoit un message de fin
+        for (int i = 0; i < 4; i++) {
+            recevoir_message_fin (msgid, client_id);
+        }
+        
+        //on peut maintenant afficher les scores
+        afficher_scores(scores);
+
+        //on demande si on continue de joueur ou non
+        continuer_jouer(msgid, client_id);
+
+        continu_jeu = recevoir_message_jeu(msgid, client_id);
+        printf("Continuer à jouer ? %s\n", continu_jeu ? "Oui" : "Non");
+        afficher_nombre_messages (msgid);
+        printf("fini\n");
+    }
 
     return EXIT_SUCCESS;
-
 }

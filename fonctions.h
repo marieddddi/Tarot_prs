@@ -35,6 +35,6 @@ bool accepter_carte(struct carte *carteLaPlusForte, struct carte *carteActuelle,
 float calculer_points(struct paquet *paquet);
 float contrat(char *choix_contrat);
 float score(struct paquet *paquet);
-float score_final(struct paquet *paquet, char *choix_contrat, bool preneur);
+float score_final(struct paquet *paquet, char *choix_contrat);
 void distribuer_cartes(struct paquet *jeu, struct paquet *j1, struct paquet *j2, struct paquet *j3, struct paquet *j4, struct paquet *chien);
 void afficher_paquet (struct paquet *paquet);
