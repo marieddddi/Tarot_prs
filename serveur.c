@@ -26,24 +26,26 @@ char *contrat_final = 0;
 //score des joueurs sous forme de tableau
 float scoreJoueurs[] = {0.0, 0.0, 0.0, 0.0};
 
+//fonction pour envoyer un message à un joueur
+void envoyer_un_message(int msgid, int joueur, char *contenuMessage) {
+    struct msg_buffer message;
+
+    message.msg_type = joueur;
+    strcpy(message.msg_text, contenuMessage);
+    if (msgsnd(msgid, &message, strlen(message.msg_text) + 1, 0) == -1) {
+        perror("Erreur lors de l'envoi du message au joueur");
+        exit(EXIT_FAILURE);
+    }
+    sleep(0.5);
+}
+
 //fonction permettant d'envoyer un message à tous les clients
 void envoyer_message(int msgid, char *message) {
     struct msg_buffer msg;
 
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        msg.msg_type = i+1;
-
-        // Réinitialiser le buffer avant de copier le message
-        memset(msg.msg_text, 0, MSG_SIZE);
-        strncpy(msg.msg_text, message, MSG_SIZE - 1);
-        msg.msg_text[MSG_SIZE - 1] = '\0'; // S'assurer que le message est terminé
-
-        if (msgsnd(msgid, &msg, strlen(msg.msg_text) + 1, 0) == -1) {
-            perror("Erreur lors de l'envoi du message");
-            exit(EXIT_FAILURE);
-        }
+    for (int i = 1; i < MAX_CLIENTS+1; i++) {
+        envoyer_un_message(msgid,i,message);    
     }
-    sleep(0.5); // Permet de donner du temps aux clients pour traiter les messages
 }
 
 //fonction permettant de recevoir un message de tous les clients indiquant qu'ils veulent jouer
@@ -63,6 +65,41 @@ void attendre_clients(int msgid) {
     }
 }
 
+//fonction permettant d'envoyer la jeu du client choisit 
+void envoyer_jeu(int msgid, struct paquet *paquet, int preneur) {
+    struct msg_buffer message;
+    char buffer[MSG_SIZE] = "";
+    char carte_info[50];
+
+    for (int i = 0; i < paquet->nb_cartes; i++) {
+        snprintf(carte_info, sizeof(carte_info), "%d %c %s\n", i + 1,
+                 paquet->jeu[i].couleur, 
+                 paquet->jeu[i].valeur);
+        strcat(buffer, carte_info);
+    }
+
+    message.msg_type = preneur;
+    printf ("\nEnvoi du jeu au joueur %d ...\n", preneur);
+    strncpy(message.msg_text, buffer, MSG_SIZE - 1);
+    message.msg_text[MSG_SIZE - 1] = '\0';
+
+    if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1) {
+        perror("Erreur lors de l'envoi du jeu");
+        exit(EXIT_FAILURE);
+    }
+    printf("Jeu envoyé au joueur %d.\n\n", preneur);
+    printf("%s\n\n", message.msg_text);
+}
+
+//fonction envoyant un paquet à tous les joueurs 
+void envoyer_jeu_joueurs (int msgid, struct paquet *paquet) {
+    //on envoie le message à chaque joueur
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        envoyer_jeu(msgid,paquet,i+1);
+    }
+    printf("Paquet envoyé à tous les joueurs.\n");
+}
+
 //fonction permettant de distribuer les cartes
 void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
     //on distribue le jeu dans les paquets de chaque joueur et du chien. 
@@ -73,26 +110,7 @@ void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
     //on envoie le paquet de chaque joueur à chaque client
     //le paquet est sous forme d'un texte , donc on le convertit en chaine de caractères
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        message.msg_type = i + 1;
-        char buffer[MSG_SIZE] = "";
-
-        for (int j = 0; j < joueurs[i]->nb_cartes; j++) {
-            char carte_info[50];
-            snprintf(carte_info, sizeof(carte_info), "%d %c %s \n", j + 1,
-                     joueurs[i]->jeu[j].couleur, 
-                     joueurs[i]->jeu[j].valeur);
-            strcat(buffer, carte_info);
-        }
-
-        strncpy(message.msg_text, buffer, MSG_SIZE - 1);
-        message.msg_text[MSG_SIZE - 1] = '\0';
-
-        if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1) {
-            perror("Erreur lors de l'envoi du message");
-            exit(EXIT_FAILURE);
-        }
-        printf("\nCartes envoyées au joueur %d.\n\n", i + 1);
-        printf ("%s\n", message.msg_text);
+        envoyer_jeu(msgid,joueurs[i],i+1);
 
         if (msgrcv(msgid, &message, MSG_SIZE, i + 1, 0) == -1) {
             perror("Erreur lors de la réception de la confirmation de réception des cartes");
@@ -148,18 +166,10 @@ int demande_contrat(int msgid, int ordre_joueurs[], int nb_joueurs) {
         contrats_possibles[99] = '\0';
        
        //on prepare le message envoyant les contrats possibles aux clients
-        message.msg_type = joueur;
-        strncpy(message.msg_text, contrats_possibles, MSG_SIZE - 1);
-        message.msg_text[MSG_SIZE - 1] = '\0';
-
-        if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1) {
-            perror("Erreur lors de l'envoi de la demande de contrat");
-            exit(EXIT_FAILURE);
-        }
+        envoyer_un_message(msgid,joueur,contrats_possibles);
         printf("Demande envoyée au joueur %d avec msg_type = %d.\n", joueur, joueur);
 
         memset(&message_reponse, 0, sizeof(message_reponse));
-        sleep(1); //pause pour que le client ait le temps de repondre
 
         if (msgrcv(msgid, &message_reponse, MSG_SIZE, joueur, 0) == -1) {
             perror("Erreur lors de la réception de la réponse du contrat");
@@ -206,58 +216,6 @@ int demande_contrat(int msgid, int ordre_joueurs[], int nb_joueurs) {
     return preneur;
 }
 
-//fonction permettant d'envoyer la jeu du client choisit 
-void envoyer_jeu(int msgid, struct paquet *paquet, int preneur) {
-    struct msg_buffer message;
-    char buffer[MSG_SIZE] = "";
-    char carte_info[50];
-
-    for (int i = 0; i < paquet->nb_cartes; i++) {
-        snprintf(carte_info, sizeof(carte_info), "%d %c %s\n", i + 1,
-                 paquet->jeu[i].couleur, 
-                 paquet->jeu[i].valeur);
-        strcat(buffer, carte_info);
-    }
-
-    message.msg_type = preneur;
-    printf ("\nEnvoi du jeu au joueur %d ...\n", preneur);
-    strncpy(message.msg_text, buffer, MSG_SIZE - 1);
-    message.msg_text[MSG_SIZE - 1] = '\0';
-
-    if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1) {
-        perror("Erreur lors de l'envoi du chien");
-        exit(EXIT_FAILURE);
-    }
-    printf("Jeu envoyé au joueur %d.\n\n", preneur);
-}
-
-//fonction envoyant un paquet à tous les joueurs 
-void envoyer_jeu_joueurs (int msgid, struct paquet *paquet) {
-    struct msg_buffer message;
-    char buffer[MSG_SIZE] = "";
-    char carte_info[50];
-
-    //on crée un buffer contenant les informations de chaque carte
-    for (int i = 0; i < paquet->nb_cartes; i++) {
-        snprintf(carte_info, sizeof(carte_info), "%d %c %s\n", i + 1, 
-            paquet->jeu[i].couleur,
-            paquet->jeu[i].valeur);
-        strcat(buffer, carte_info);
-    }
-
-    //on envoie le message à chaque joueur
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        message.msg_type = i+1;
-        strncpy(message.msg_text, buffer, MSG_SIZE - 1);
-        message.msg_text[MSG_SIZE - 1] = '\0';
-
-        if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1 ) {
-            perror("Erreur lors de l'envoi du paquet en cours");
-            exit(EXIT_FAILURE);
-        }
-    }
-    printf("Paquet envoyé à tous les joueurs.\n");
-}
 
 //fonction permettant d'envoyer le jeu du preneur avec le chien en plus
 struct paquet *envoyer_jeu_avec_chien(int msgid, int preneur, struct paquet *chien, struct paquet *paquet) {
@@ -323,23 +281,11 @@ void faire_chien(int msgid, struct paquet *chien, int preneur, struct paquet *pa
                 printf("\nC'est un atout, impossible !\n");
 
                 //on envoie que c'est un atout 
-                message.msg_type = preneur;
-                strcpy(message.msg_text, "atout");
-                if (msgsnd(msgid, &message, strlen(message.msg_text) + 1, 0) == -1) {
-                    perror("Erreur lors de l'envoi du paquet au preneur");
-                    exit(EXIT_FAILURE);
-                }
-                sleep(0.5);
+                envoyer_un_message(msgid,preneur,"atout");
             }
             else{
                 //on envoie que c'est bon 
-                message.msg_type = preneur;
-                strcpy(message.msg_text, "bon");
-                if (msgsnd(msgid, &message, strlen(message.msg_text) + 1, 0) == -1) {
-                    perror("Erreur lors de l'envoi du paquet au preneur");
-                    exit(EXIT_FAILURE);
-                }
-                sleep(0.5);
+                envoyer_un_message(msgid,preneur,"bon");
                 non_valide = false;
             } 
         }
@@ -427,15 +373,7 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
             printf("\nTour du joueur %d\n\n", joueur);
 
             //on envoie au joueur que c'est à lui de jouer
-            message.msg_type = joueur;
-            strncpy(message.msg_text, aToi, MSG_SIZE - 1);
-            message.msg_text[MSG_SIZE - 1] = '\0'; 
-
-            if (msgsnd(msgid, &message, sizeof(message.msg_text), 0) == -1) {
-                perror("Pb envoie");
-                exit(EXIT_FAILURE);
-            }
-            sleep(1); //pause pour que le joueur puisse lire le message
+            envoyer_un_message(msgid,joueur,aToi);
 
             //le joueur doit envoyer qu'il est prêt à jouer une carte
             memset (&message, 0, sizeof(message));
