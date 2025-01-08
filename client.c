@@ -302,37 +302,12 @@ void vider_messages_client(int msgid, int client_id) {
     }
 }
 
-
-int main(int argc, char *argv[]) {
+void jouer_partie (int client_id, int msgid) {
     int preneur = 0;
     struct msg_buffer message;
-    if (argc != 2) {
-        printf("Usage: %s <client_id>\n", argv[0]);
-        return EXIT_FAILURE;
-    }
-
-    int client_id = atoi(argv[1]);
-    int msgid = msgget(MSG_KEY, 0666);
-    if (msgid == -1) {
-        perror("Erreur lors de la connexion à la file de messages");
-        return EXIT_FAILURE;
-    }
-
-    // Connexion à la mémoire partagée pour les scores
-    int shmid = shmget(SHM_KEY, 4 * sizeof(float), 0666);
-    if (shmid == -1) {
-        perror("Erreur lors de la connexion à la mémoire partagée");
-        return EXIT_FAILURE;
-    }
-
-    float *scores = (float *)shmat(shmid, NULL, 0);
-    if (scores == (void *)-1) {
-        perror("Erreur lors de l'attachement à la mémoire partagée");
-        return EXIT_FAILURE;
-    }
-
+    
     //jeu
-    joueur_pret(msgid, client_id);
+   // joueur_pret(msgid, client_id);
     while (preneur == 0){
         recevoir_cartes(msgid, client_id);
         preneur = choix_contrat_client(msgid, client_id);
@@ -344,10 +319,156 @@ int main(int argc, char *argv[]) {
     faire_un_tour(msgid, client_id);
     
     //on recoit un message de fin
-    recevoir_message_fin (msgid, client_id);    
+    recevoir_message_fin (msgid, client_id);   
+}
 
-    //on peut maintenant afficher les scores
-    afficher_scores(scores);
+
+int main(int argc, char *argv[]) {
+    int choix;
+    if (argc != 2) {
+        printf("Usage: %s <client_id>\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+
+    struct msg_buffer message;
+
+    // Connexion à la mémoire partagée pour les scores
+    int shmid = shmget(SHM_KEY, 4 * sizeof(float), 0666);
+    if (shmid == -1) {
+        perror("Erreur lors de la connexion à la mémoire partagée");
+        //on affiche le message d'erreur
+        return EXIT_FAILURE;
+    }
+
+    float *scores = (float *)shmat(shmid, NULL, 0);
+    if (scores == (void *)-1) {
+        perror("Erreur lors de l'attachement à la mémoire partagée");
+        return EXIT_FAILURE;
+    }
+
+    int client_id = atoi(argv[1]);
+    /* on affiche un menu demandant au joueur de choisir une action:
+    1- joueur une partie 
+    2- afficher les scores
+    3- quitter le jeu */
+    printf("Bienvenue dans le jeu de tarot !\n");
+
+    while (1) {
+        int msgid = msgget(MSG_KEY, 0666);
+        if (msgid == -1) {
+            perror("Erreur lors de la connexion à la file de messages");
+            printf("val msgid : %d\n", msgid);
+            return EXIT_FAILURE;
+        }
+        printf("val msgid: %d\n", msgid);
+
+        printf("Que voulez-vous faire ? \n");
+        printf("1- Jouer une partie\n");
+        printf("2- Afficher les scores\n");
+        printf("3- Afficher les règles du jeu\n");
+        printf("4- Quitter le jeu\n");
+        if (scanf("%d", &choix) != 1) {
+            printf("Entrée invalide. Veuillez entrer un numéro.\n");
+            while (getchar() != '\n'); // Vide le buffer
+            continue; // Recommence la boucle
+        }
+
+        while (getchar() != '\n'); // Vide les caractères restants dans le buffer
+        switch (choix) {
+            case 1:
+                //on joue une partie, on envoie d'abord au serveur qu'on veut jouer une partie
+                memset(&message, 0, sizeof(message));
+                message.msg_type = 5;
+                strcpy (message.msg_text, "jouer");
+                if (msgsnd (msgid, &message, sizeof(message.msg_text), 0) == -1) {
+                    perror("Erreur lors de l'envoi du message");
+                    printf ("texte: %s\n", message.msg_text);
+                    printf("type: %d\n", message.msg_type);
+                    printf("msgid: %d\n", msgid);
+                    return EXIT_FAILURE;
+                }
+                sleep(1);
+                jouer_partie(client_id, msgid);
+                sleep(2);
+                msgctl(msgid, IPC_RMID, NULL);
+                sleep(2);
+                break;
+            case 2:
+                afficher_scores(scores);
+                break;
+            case 3:
+                //affichage des règles
+                printf("Règles du jeu de tarot :\n");
+                printf("1- Le jeu se joue à 4 joueurs.\n");
+                printf("2- Le jeu se joue avec un jeu de 78 cartes. Chaque joueur a 18 cartes\n");
+                printf("\nExplication des cartes:\n");
+                printf("1- On a des cartes simples: 1,2,3,4,5,6,7,8,9,10,V,C,D,R (de la moins forte à la plus forte) dans les couleurs suivantes: coeur (C), trèfle (T), carreau (K) et pique (P)\n");
+                printf("2- On a des atouts: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21 (de la moins forte à la plus forte) représentés par la couleur ' '\n");
+                printf("3- On a 3 bouts: les atouts 1 et 21 et l'excuse (*)\n");
+                printf("L'atout est un joker que l'on peut jouer à n'importe quel moment de la partie.\n");
+                printf("Peut importe qui prend, cette carte nous appartient toujours. On la mettra dans notre paquet une fois jouée \n");
+                printf("\n\n");
+                printf("Debut du jeu: n");
+                printf("Chaque joueur a 18 cartes en main\n");
+                printf("A tour de role, selon un ordre défini, chaque joueur doit choisir le contrat qu'il souhaite faire\n");
+                printf("Le contrat est choisi parmi les 4 contrats possibles : \n ");
+                printf("1- Passe: on ne fait rien\n");
+                printf("2- Petite: on prend en estimant qu'on a un 'petit' jeu. Notre score sera x1\n");
+                printf("3- Garde: on prend en estimant qu'on a un bon jeu. Notre score sera x2\n");
+                printf("\nA savoir: on ne peut qu'augmenter de contrat à partir de la petite.\n");
+                printf("Par exemple, le joueur 1 choisit de passer. Le joueur 2 peut soit: passer, petite, garde. Imaginons qu'il fasse une petite, le joueur 3 ne peut plus que faire une petite ou une garde.\n");
+                printf("Le joueur avec le contrat le plus élevé est celui qui prend.\n");
+                printf("On montre le chien à tous les joueurs.\n");
+                printf("\n\n");
+                printf("Faire son chien:\n");
+                printf("Le joueur qui prend va faire son chien. Le chien est composé de 6 cartes. \n");
+                printf("Le joueur doit intégrer les cartes du chient dans son jeu et en enlver 6.\n");
+                printf("Attention, il ne doit pas enlever d'atouts, de bouts ou de rois à part s'il n'a pas le choix. Dans quel cas, il doit le montrer.\n");
+                printf ("\n\n");
+                printf("Déroulement du jeu: \n");
+                printf("Le joueur qui prend tient tout seul. Les autres joueurs tiennent ensemble.\n");
+                printf("Selon l'ordre, le premier joueur choisit une carte à jouer. Il peut jouer une carte de son jeu ou un atout.\n");
+                printf("Le joueur suivant doit jouer une carte de la même couleur que la carte précédente.\n");  
+                printf("Si le joueur suivant n'a pas de carte de la couleur précédente, il peut jouer un atout.\n");
+                printf("Attention, si un atout a été joué avant, le joueur suivant doit jouer un atout plus forte.\n");
+                printf("Si le joueur n'a pas d'atout plus fort, il peut jouer un atout plus faible.\n");
+                printf("S'il n'a pas d'atout, il peut joueur n'importe quelle carte, qui sera perdu pour lui.\n");
+                printf("Le jeu se poursuit ainsi jusqu'à ce que tous les joueurs aient joué.\n");
+                printf("C'est le joueur qui a la plus grosse carte qui gagne la manche. \n");
+                printf("Il récupère toutes les cartes de la manche et les met dans son paquet.\n");
+                printf("Le jeu se poursuit ainsi jusqu'à ce que tous les joueurs aient joué toutes leurs cartes.\n");
+                printf("\n\n");
+                printf("Scores: \n");
+                printf("Les cartes sont comptées par paire comme suit:\n");
+                printf("Un bout + une petite carte (carte simple de valeur 1,2,3,4,5,6,7,8,9,10) vaut 5 points.\n");
+                printf("Un roi + une petite carte vaut 5 points.\n");
+                printf("Une dame + une petite vaut 4 points.\n");
+                printf("Un cavalier + une petite carte vaut 3 points.\n");
+                printf("Un valet + une petite carte vaut 2 points.\n");
+                printf("2 petites cartes ou 2 atouts (or bouts) ou 1 petite carte + 1 atout (or bouts) valent 1 point.\n");
+                printf("On compte donc toutes les cartes du paquet du preneur comme expliqué ci-dessus.\n");
+                printf("Le preneur doit faire un certain nombre de points pour gagner la partie selon les bouts en main.\n");
+                printf("Si le preneur a les 3 bouts, il doit faire 36 points.\n");
+                printf("Si le preneur a 2 bouts, il doit faire 41 points. \n");
+                printf("Si le preneur a 1 bout, il doit faire 51 points. \n");
+                printf("Si le preneur n'a pas de bout, il doit faire 56 points.\n");
+                printf("Pour calculer le score fait, on soustrait le total calculé précédemment au score à faire.\n");
+                printf("Si le score fait est positif, le preneur gagne la partie. On dit qu'elle est faire. \n");
+                printf("Si le score fait est négatif, le preneur perd la partie. On dit qu'il a chuté. \n");
+                printf("Tout contrat valant arbitrairement 25 points, on rajoute 25 points au nombre de points de gain ou de perte.\n");
+                printf("On multiplie ensuite ce total par 1 si on a choisit une petite ou par 2 si on a fait une garde. \n");
+                printf("Les adversaires auront un score de l'inverse de celui du preneur.\n");
+                printf("Enfin, on multiplie par 3 le score du preneur étant donné qu'il était 1 contre 3. \n");
+                printf("\n\n");
+                break;
+            case 4:
+                printf("Au revoir !\n");
+                return EXIT_SUCCESS;
+            default:
+                printf("Choix non valide. Veuillez réessayer.\n");
+        }
+    }
 
     // Détachement de la mémoire partagée
    // if (shmdt(scores) == -1) {
