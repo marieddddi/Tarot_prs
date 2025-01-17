@@ -118,6 +118,7 @@ int choix_contrat_client(int msgid, int client_id) {
             reponse_valide = 1;
         }
     }
+    printf("Vous avez choisi le contrat : %s\n", contrat_choisi);
 
     message_reponse.msg_type = client_id+10;
     strncpy(message_reponse.msg_text, contrat_choisi, MSG_SIZE - 1);

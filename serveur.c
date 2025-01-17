@@ -66,22 +66,38 @@ void envoyer_jeu(int msgid, struct paquet *paquet, int preneur, int param) {
     struct msg_buffer message;
     char buffer[MSG_SIZE] = "";
     char carte_info[50];
-
+    const char *couleur;  // Déclare une variable pour le fond de couleur
+    const char *rouge = "\033[41m";  // Code ANSI pour fond rouge
+    const char *reset = "\033[0m";   // Code ANSI pour réinitialiser la couleur
     if (param == 0) {
         for (int i = 0; i < paquet->nb_cartes; i++) {
-            snprintf(carte_info, sizeof(carte_info), "%d %c %s\n", i + 1,
-                    paquet->jeu[i].couleur, 
-                    paquet->jeu[i].valeur);
+              // Choisir le fond en fonction de la couleur de la carte
+            if (paquet->jeu[i].couleur == 'C' || paquet->jeu[i].couleur == 'K') {
+                couleur = rouge;  // Fond rouge pour les cartes de cœur et carreau
+            } 
+            else {
+                couleur = reset;  // Pas de fond pour les cartes de trèfle et pique
+            }
+            snprintf(carte_info, sizeof(carte_info), "%s%d%s %c %s\n", couleur, i + 1, reset,
+                 paquet->jeu[i].couleur, 
+                 paquet->jeu[i].valeur);
             strcat(buffer, carte_info);
-        }
+            }
   } else {
         // Envoie en respectant l'ordre circulaire à partir de 'param'
         for (int i = 0; i < paquet->nb_cartes; i++) {
+            if (paquet->jeu[i].couleur == 'C' || paquet->jeu[i].couleur == 'K') {
+                couleur = rouge;  // Fond rouge pour les cartes de cœur et carreau
+            } 
+            else {
+                couleur = reset;  // Pas de fond pour les cartes de trèfle et pique
+            }
             // Calcule le joueur recevant cette carte (ordre circulaire)
             int joueur_actuel = ((param - 1 + i) % MAX_CLIENTS) + 1;
-            snprintf(carte_info, sizeof(carte_info), "%d %c %s (joueur %d)\n", i + 1,
+            snprintf(carte_info, sizeof(carte_info), "%s%d %c %s%s (joueur %d)\n", couleur, i + 1,
                     paquet->jeu[i].couleur, 
                     paquet->jeu[i].valeur,
+                    reset,
                     joueur_actuel);
             strcat(buffer, carte_info);
         }
