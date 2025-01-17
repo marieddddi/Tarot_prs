@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/shm.h>
 #include "fonctions.h"
+#include <pthread.h>
 
 #define MSG_KEY 1234
 #define MAX_CLIENTS 4
@@ -25,6 +26,9 @@ char *contrat_final = 0;
 
 //score des joueurs sous forme de tableau
 float scoreJoueurs[] = {0.0, 0.0, 0.0, 0.0};
+
+//mutex du score
+pthread_mutex_t mutex_scores = PTHREAD_MUTEX_INITIALIZER;
 
 //fonction pour envoyer un message à un joueur
 void envoyer_un_message(int msgid, int joueur, char *contenuMessage) {
@@ -61,60 +65,71 @@ void attendre_clients(int msgid) {
     }
 }
 
-//fonction permettant d'envoyer la jeu du client choisit 
+// Fonction permettant d'envoyer le jeu au client choisi
 void envoyer_jeu(int msgid, struct paquet *paquet, int preneur, int param) {
     struct msg_buffer message;
-    char buffer[MSG_SIZE] = "";
-    char carte_info[50];
-    const char *couleur;  // Déclare une variable pour le fond de couleur
-    const char *rouge = "\033[41m";  // Code ANSI pour fond rouge
-    const char *reset = "\033[0m";   // Code ANSI pour réinitialiser la couleur
+   
+
+    // Couleurs ANSI pour les cartes
+    const char *rouge = "\033[31m"; // Rouge pour ♥ et ♦
+    const char *reset = "\033[0m";  // Réinitialisation des couleurs
+
+    const char *symbole;
+        const char *couleur;
+
+    char buffer[1024] = "";  // Buffer
+    char temp[100];
     if (param == 0) {
         for (int i = 0; i < paquet->nb_cartes; i++) {
-              // Choisir le fond en fonction de la couleur de la carte
-            if (paquet->jeu[i].couleur == 'C' || paquet->jeu[i].couleur == 'K') {
-                couleur = rouge;  // Fond rouge pour les cartes de cœur et carreau
-            } 
-            else {
-                couleur = reset;  // Pas de fond pour les cartes de trèfle et pique
+            //ON associe les couleurs et les symboles
+            switch (paquet->jeu[i].couleur) {
+                case 'C': symbole = "♥"; couleur = rouge; break;
+                case 'K': symbole = "♦"; couleur = rouge; break;
+                case 'T': symbole = "♣"; couleur = reset; break;
+                case 'P': symbole = "♠"; couleur = reset; break;
+                default: symbole = " "; couleur = reset; break;
             }
-            snprintf(carte_info, sizeof(carte_info), "%s%d%s %c %s\n", couleur, i + 1, reset,
-                 paquet->jeu[i].couleur, 
-                 paquet->jeu[i].valeur);
-            strcat(buffer, carte_info);
-            }
-  } else {
-        // Envoie en respectant l'ordre circulaire à partir de 'param'
+
+            snprintf(temp, sizeof(temp), "%2d: %s%-2s%s %s%s  \n", i + 1, couleur, paquet->jeu[i].valeur, reset, symbole, reset);
+            strncat(buffer, temp, sizeof(buffer) - strlen(buffer) - 1);
+        }
+    } else {
         for (int i = 0; i < paquet->nb_cartes; i++) {
-            if (paquet->jeu[i].couleur == 'C' || paquet->jeu[i].couleur == 'K') {
-                couleur = rouge;  // Fond rouge pour les cartes de cœur et carreau
-            } 
-            else {
-                couleur = reset;  // Pas de fond pour les cartes de trèfle et pique
+            //ON associe les couleurs et les symboles
+            switch (paquet->jeu[i].couleur) {
+                case 'C': symbole = "♥"; couleur = rouge; break;
+                case 'K': symbole = "♦"; couleur = rouge; break;
+                case 'T': symbole = "♣"; couleur = reset; break;
+                case 'P': symbole = "♠"; couleur = reset; break;
+                default: symbole = " "; couleur = reset; break;
             }
             // Calcule le joueur recevant cette carte (ordre circulaire)
             int joueur_actuel = ((param - 1 + i) % MAX_CLIENTS) + 1;
-            snprintf(carte_info, sizeof(carte_info), "%s%d %c %s%s (joueur %d)\n", couleur, i + 1,
-                    paquet->jeu[i].couleur, 
-                    paquet->jeu[i].valeur,
-                    reset,
-                    joueur_actuel);
-            strcat(buffer, carte_info);
+            snprintf(temp, sizeof(temp), "%2d: %s%-2s%s %s%s (joueur %d) \n",i+1, couleur, paquet->jeu[i].valeur, reset, symbole, reset, joueur_actuel);
+            strncat(buffer, temp, sizeof(buffer) - strlen(buffer) - 1);
+        
         }
     }
-            
 
+    // Vérifier si le buffer dépasse la taille
+    if (strlen(buffer) >= sizeof(message.msg_text)) {
+        fprintf(stderr, "Erreur : message trop grand pour être envoyé.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Préparer et envoyer le message
     message.msg_type = preneur;
-    printf ("\nEnvoi du jeu au joueur %d ...\n", preneur);
-    strncpy(message.msg_text, buffer, MSG_SIZE - 1);
-    message.msg_text[MSG_SIZE - 1] = '\0';
+    strncpy(message.msg_text, buffer, sizeof(message.msg_text) - 1);
+    message.msg_text[sizeof(message.msg_text) - 1] = '\0';
 
-    if (msgsnd(msgid, &message, MSG_SIZE, 0) == -1) {
+    if (msgsnd(msgid, &message, sizeof(message.msg_text), 0) == -1) {
         perror("Erreur lors de l'envoi du jeu");
         exit(EXIT_FAILURE);
     }
-    printf("Jeu envoyé au joueur %d.\n\n", preneur);
 }
+
+
+    
 
 //fonction envoyant un paquet à tous les joueurs 
 void envoyer_jeu_joueurs (int msgid, struct paquet *paquet, int param) {
@@ -490,9 +505,12 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
 }
 
 //fonction qui met à jour les scores d'un joueur
+//L'ajout du mutex permet de garantir qu'un client ne lise pas un score en cours de modification
 void mettre_a_jour_scores(float *scores, int joueur, float valeur) {
+    pthread_mutex_lock(&mutex_scores);  // Verrouille l'accès aux scores
     scores[joueur] += valeur;
     printf("Score mis à jour : Joueur %d -> %.2f\n", joueur + 1, scores[joueur]);
+    pthread_mutex_unlock(&mutex_scores);  // Déverrouille
 }
 
 //fonction qui met à jour les scores des joueurs 
