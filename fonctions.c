@@ -36,6 +36,7 @@ void creer_jeu(struct carte jeu[78]){
     }
 }
 
+//creer un paquet de 78 cartes
 void creer_paquet (struct paquet *p){
     p->nb_cartes = 78;
     creer_jeu(p->jeu);
@@ -57,6 +58,7 @@ bool est_meme_couleur (struct carte *carte, char couleur){
     return false;
 }
 
+//Savoir si le paquet possède une carte de couleur donnée
 bool possede_couleur(struct paquet *p, char couleur){
     for (int i = 0; i < p->nb_cartes; i++){
         if (p->jeu[i].couleur == couleur){
@@ -67,11 +69,13 @@ bool possede_couleur(struct paquet *p, char couleur){
     return false;
 }
 
+//convertir un char en entier
 int valeur_en_int(const char *valeur) {
     // Convertit une chaîne de caractères en entier
     return atoi(valeur);
 }
 
+//convertir un char en index
 int valeur_en_index(const char *valeur) {
     const char *ordre[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "V", "C", "D", "R"};
     int taille = sizeof(ordre) / sizeof(ordre[0]);
@@ -85,6 +89,7 @@ int valeur_en_index(const char *valeur) {
     return -1; // Retourne -1 si la valeur n'est pas valide
 }
 
+//fonction pour savoir si on peut jouer une carte, si elle respecte les règles
 bool accepter_carte(struct carte *carteLaplusForte, struct carte *carteActuelle, struct paquet *paquet, char couleurJouee){
     //si precedent nul accepte
     if (carteLaplusForte->couleur == 0){
@@ -129,6 +134,7 @@ bool accepter_carte(struct carte *carteLaplusForte, struct carte *carteActuelle,
 
 //fonction pour savoir qui a la plus forte carte
 int qui_a_la_plus_forte_carte(struct carte *carteLaPlusForte, struct carte *carteActuelle, char couleurJouee) {
+    //On convertit les chars en entier
     int valeurActuelle = valeur_en_index(carteActuelle->valeur);
     int valeurForte = valeur_en_index(carteLaPlusForte->valeur);
 
@@ -165,18 +171,11 @@ int qui_a_la_plus_forte_carte(struct carte *carteLaPlusForte, struct carte *cart
     //si on joue un atout, on gagne
     if (est_atout(carteActuelle) && !est_atout(carteLaPlusForte)) {
         return 1;
-    }/*
-    if (est_atout(carteLaPlusForte) && !est_atout(carteActuelle)) {
-        printf ("atout\n");
-        return 0;
     }
-    if (!est_atout (carteActuelle) && carteActuelle->couleur != couleurJouee){
-        printf ("la ?\n");
-        return 0;
-    }*/
     return 0;
 }
 
+//calcul des points d'un paquet
 float calculer_points(struct paquet *paquet){
     float points = 0.0;
     for (int i = 0; i < paquet->nb_cartes; i++){
@@ -230,6 +229,7 @@ float score(struct paquet *paquet){
     return (calculer_points(paquet) - nb_points);
 }
 
+//score final de la partie
 float score_final(struct paquet *paquet, char *choix_contrat){
     return (25.0 + score(paquet)) * contrat(choix_contrat);
 }
@@ -237,7 +237,7 @@ float score_final(struct paquet *paquet, char *choix_contrat){
 // Fonction qui permet de distribuer les cartes
 void distribuer_cartes(struct paquet *jeu, struct paquet *j1, struct paquet *j2, struct paquet *j3, struct paquet *j4, struct paquet *chien) {
     // Mélange du jeu
-    srand(time(NULL));  // Initialisation du générateur de nombres aléatoires
+    srand(time(NULL));  // Initialisation du générateur de nombres aléatoires pour distribuer les cartes aléatoirement
     for (int i = 0; i < jeu->nb_cartes; i++) {
         int j = rand() % jeu->nb_cartes;  // Sélection aléatoire d'une carte
         struct carte temp = jeu->jeu[i];  // Echange des cartes
@@ -272,6 +272,7 @@ void distribuer_cartes(struct paquet *jeu, struct paquet *j1, struct paquet *j2,
     }
 }
 
+//fonction pour afficher le paquet
 void afficher_paquet(struct paquet *paquet) {
     for (int i = 0; i < paquet->nb_cartes; i++) {
         printf("%c %s \n", paquet->jeu[i].couleur, paquet->jeu[i].valeur);
