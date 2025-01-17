@@ -5,7 +5,7 @@
 void init_carte(struct carte *carte){
     carte->couleur = '0';
     carte->valeur[0] = '0';
-    carte->valeur[1] = '\0';  // La chaîne de caractères doit être terminée par un caractère nul
+    carte->valeur[1] = '\0';  // La chaîne de caractères doit être terminée par un \0
     carte->point = 0.0;
 }
 
@@ -18,6 +18,7 @@ void creer_jeu(struct carte jeu[78]){
     float points[14] = {0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1.5, 2.5, 3.5, 4.5};  // Points associés à chaque valeur
     char* atouts[22] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "21", "*"}; // '*' = excuse
     float points_atouts[22] = {4.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 4.5, 4.5};  // Points associés à chaque atout
+    
     // Création des cartes de couleurs
     for(i = 0; i < 4; i++){
         for(j = 0; j < 14; j++){
@@ -40,6 +41,7 @@ void creer_paquet (struct paquet *p){
     creer_jeu(p->jeu);
 }
 
+//Savoir si la carte est un atout
 bool est_atout(struct carte *carte){
     if (carte->couleur == ' '){
         return true;
@@ -47,6 +49,7 @@ bool est_atout(struct carte *carte){
     return false;
 }
 
+//Savoir si la carte est une carte de couleur donnée
 bool est_meme_couleur (struct carte *carte, char couleur){
     if (carte->couleur == couleur){
         return true;
@@ -275,88 +278,3 @@ void afficher_paquet(struct paquet *paquet) {
     }
 }
 
-
-
-/*
-int main(){
-    struct carte jeu[78];
-    creer_jeu(jeu);
-
-
-    //creer paquet
-    struct paquet p;
-    creer_paquet(&p);
-    for (int i = 0; i < p.nb_cartes; i++){
-        printf("Carte %d: %c %s %f\n", i, p.jeu[i].couleur, p.jeu[i].valeur, p.jeu[i].point);
-    }
-    //on creait une carte precedente
-    struct carte cartePrecedente;
-    init_carte(&cartePrecedente);
-    cartePrecedente.couleur = 'D';
-    cartePrecedente.valeur[0] = '3';
-    cartePrecedente.valeur[1] = '\0';
-    cartePrecedente.point = 0.5;
-    //on choisit une carte actuelle
-    struct carte carteActuelle;
-    init_carte(&carteActuelle);
-    carteActuelle.couleur = 'T';
-    carteActuelle.valeur[0] = '5';
-    carteActuelle.valeur[1] = '\0';
-    carteActuelle.point = 0.5;
-   
-   //on cree une carte atout 
-    struct carte carteAtout;
-    init_carte(&carteAtout);
-    carteAtout.couleur = 'C';
-    carteAtout.valeur[0] = '5';
-    carteAtout.valeur[1] = '\0';
-    carteAtout.point = 0.5;
-    
-   //on cree un jeu de 2 cartes 
-    struct paquet jeu2;
-    creer_paquet(&jeu2);
-    jeu2.jeu[0] = carteAtout;
-    jeu2.jeu[1] = carteActuelle;
-    jeu2.nb_cartes = 2;
-    //on teste si on accepte la carte
-    if (accepter_carte(&cartePrecedente, &carteAtout, &jeu2)){
-        printf("On accepte la carte\n");
-    } else {
-        printf("On refuse la carte\n");
-    }
-
-    printf ("Points: %f\n", calculer_points(&jeu2));
-
-    //test distribution des cartes
-    struct paquet j1, j2, j3, j4, chien;
-    creer_paquet(&j1);
-    creer_paquet(&j2);
-    creer_paquet(&j3);
-    creer_paquet(&j4);
-    creer_paquet(&chien);
-    distribuer_cartes(&p, &j1, &j2, &j3, &j4, &chien);
-    printf ("Joueur 1\n");
-    for (int i = 0; i < j1.nb_cartes; i++){
-        printf("Carte %d: %c %s %f\n", i, j1.jeu[i].couleur, j1.jeu[i].valeur, j1.jeu[i].point);
-    }
-    printf ("Joueur 2\n");
-    for (int i = 0; i < j2.nb_cartes; i++){
-        printf("Carte %d: %c %s %f\n", i, j2.jeu[i].couleur, j2.jeu[i].valeur, j2.jeu[i].point);
-    }
-    printf ("Joueur 3\n");
-    for (int i = 0; i < j3.nb_cartes; i++){
-        printf("Carte %d: %c %s %f\n", i, j3.jeu[i].couleur, j3.jeu[i].valeur, j3.jeu[i].point);
-    }
-    printf ("Joueur 4\n");
-    for (int i = 0; i < j4.nb_cartes; i++){
-        printf("Carte %d: %c %s %f\n", i, j4.jeu[i].couleur, j4.jeu[i].valeur, j4.jeu[i].point);
-    }
-    printf ("Chien\n");
-    for (int i = 0; i < chien.nb_cartes; i++){
-        printf("Carte %d: %c %s %f\n", i, chien.jeu[i].couleur, chien.jeu[i].valeur, chien.jeu[i].point);
-    }
-
-
-
-    return 0;
-}*/

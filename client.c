@@ -208,7 +208,7 @@ void faire_chien_client(int msgid, int preneur) {
 void faire_un_tour(int msgid, int joueur_id) {
     struct msg_buffer message_reponse;
 
-    for(int i = 1; i > 0 ; i--) { //on doit faire 18 tours car on a tous 18 cartes
+    for(int i = 18; i > 0 ; i--) { //on doit faire 18 tours car on a tous 18 cartes
         bool carte_valide = false;
         bool permissionJouer = false;
         int carte_choisie = 0;
@@ -249,8 +249,8 @@ void faire_un_tour(int msgid, int joueur_id) {
 
         while (!carte_valide) {
             carte_choisie = 0;
-            while (carte_choisie <= 0 || carte_choisie > 18) {
-                printf("Choisissez une carte à jouer (1-%d) : ", 18); // Ajustez 24 à la taille réelle si nécessaire
+            while (carte_choisie <= 0 || carte_choisie > i) {
+                printf("Choisissez une carte à jouer (1-%d) : ", i); // Ajustez 24 à la taille réelle si nécessaire
                 scanf("%d", &carte_choisie);
             }
             sleep(1);

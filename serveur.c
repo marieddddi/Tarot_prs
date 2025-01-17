@@ -36,7 +36,7 @@ void envoyer_un_message(int msgid, int joueur, char *contenuMessage) {
         perror("Erreur lors de l'envoi du message au joueur");
         exit(EXIT_FAILURE);
     }
-    sleep(0.5);
+    sleep(1);
 }
 
 //fonction permettant d'envoyer un message à tous les clients
@@ -359,7 +359,7 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
     int joueurQuiPrendEnsuite ;
     int premierJoueur;
 
-    while (joueur1.nb_cartes>17){
+    while (joueur1.nb_cartes>0){
         carte_valide = false; //au depart la carte n'est pas valide
         struct carte carteLaPlusForte = { 0, {0,0}, 0.0 }; //la carte la plus forte est une carte à 0 car personne n'a joué
         couleurJouee = ' ';
