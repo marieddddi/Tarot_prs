@@ -36,13 +36,10 @@ void envoyer_un_message(int msgid, int joueur, char *contenuMessage) {
         perror("Erreur lors de l'envoi du message au joueur");
         exit(EXIT_FAILURE);
     }
-    sleep(1);
 }
 
 //fonction permettant d'envoyer un message à tous les clients
 void envoyer_message(int msgid, char *message) {
-    struct msg_buffer msg;
-
     for (int i = 1; i < MAX_CLIENTS+1; i++) {
         envoyer_un_message(msgid,i,message);    
     }
@@ -61,7 +58,6 @@ void attendre_clients(int msgid) {
         if (strcmp(message.msg_text, "jouer") == 0) {
             client_pret++;
         }
-        sleep(0.5);
     }
 }
 
@@ -126,7 +122,7 @@ void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
     for (int i = 0; i < MAX_CLIENTS; i++) {
         envoyer_jeu(msgid,joueurs[i],i+1,0);
 
-        if (msgrcv(msgid, &message, MSG_SIZE, i + 1, 0) == -1) {
+        if (msgrcv(msgid, &message, MSG_SIZE, i+10 + 1, 0) == -1) {
             perror("Erreur lors de la réception de la confirmation de réception des cartes");
             exit(EXIT_FAILURE);
         }
@@ -185,7 +181,7 @@ int demande_contrat(int msgid, int ordre_joueurs[], int nb_joueurs) {
 
         memset(&message_reponse, 0, sizeof(message_reponse));
 
-        if (msgrcv(msgid, &message_reponse, MSG_SIZE, joueur, 0) == -1) {
+        if (msgrcv(msgid, &message_reponse, MSG_SIZE, joueur+10, 0) == -1) {
             perror("Erreur lors de la réception de la réponse du contrat");
             break;
         }
@@ -226,14 +222,12 @@ int demande_contrat(int msgid, int ordre_joueurs[], int nb_joueurs) {
             exit(EXIT_FAILURE);
         }
     }
-    sleep(1);
     return preneur;
 }
 
 
 //fonction permettant d'envoyer le jeu du preneur avec le chien en plus
 struct paquet *envoyer_jeu_avec_chien(int msgid, int preneur, struct paquet *chien, struct paquet *paquet) {
-    struct msg_buffer message;
 
     // Ajout des cartes du chien au paquet
     for (int i = 0; i < chien->nb_cartes; i++) {
@@ -267,19 +261,17 @@ void faire_chien(int msgid, struct paquet *chien, int preneur, struct paquet *pa
     int index = 0;
     //on stock le nouveau jeu fait avec afficher chien
     envoyer_jeu_avec_chien (msgid, preneur, chien, paquet);
-    sleep(1);
 
     //le preneur doit enlever 6 cartes de son paquet qui en contient maintenant 24 avec les 6 du chien
     for (int i = 0; i < 6; i++) {
         //tant que la carte n'est pas valide on re demande
         while(non_valide){
             // Réception des indices des cartes que le preneur met dans le chien
-            if (msgrcv(msgid, &message, MSG_SIZE, preneur, 0) == -1) {
+            if (msgrcv(msgid, &message, MSG_SIZE, preneur+10, 0) == -1) {
                 perror("Erreur lors de la réception des indices des cartes");
                 exit(EXIT_FAILURE);
             }
             printf ("\nIndices de la carte : %s\n", message.msg_text);
-            sleep(0.5);
 
             index = atoi(message.msg_text);
             index = index -1;
@@ -316,7 +308,6 @@ void faire_chien(int msgid, struct paquet *chien, int preneur, struct paquet *pa
         printf("Le paquet contient maintenant %d cartes.\n\n", paquet->nb_cartes);
         //on envoie le nouveau jeu 
         envoyer_jeu (msgid, paquet, preneur,0);
-        sleep(1);
         non_valide = true;
     }
 
@@ -335,7 +326,6 @@ void ajouter_carte(struct paquet *paquetAjout, struct carte *carteAjoutee) {
 // Fonction pour mettre à jour l'ordre des joueurs
 void mettreAJourOrdreJoueurs(int ordre_joueurs[], int JoueurQuiPrend) {
     int nouvel_ordre[MAX_CLIENTS];
-    int index = 0;
 
     // Trouver la position actuelle du joueur qui prend
     int position = -1;
@@ -393,7 +383,7 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
 
             //le joueur doit envoyer qu'il est prêt à jouer une carte
             memset (&message, 0, sizeof(message));
-            if (msgrcv(msgid, &message, sizeof(message.msg_text), joueur, 0) == -1) {
+            if (msgrcv(msgid, &message, sizeof(message.msg_text), joueur+10, 0) == -1) {
                 perror("Erreur lors de la réception de l'accusé de réception du joueur");
                 exit(EXIT_FAILURE);
             }
@@ -402,18 +392,15 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
                 fprintf(stderr, "Le joueur %d n'a pas confirmé qu'il est prêt.\n", joueur);
                 exit(EXIT_FAILURE);
             }
-            sleep(1); //pause pour que le joueur puisse lire le message
 
             //on envoie le jeu du joueur pour qu'il puisse choisir sa carte
             envoyer_jeu(msgid, joueurs[joueur-1], joueur,0);
-            sleep(1);
 
             while (!carte_valide) {
-                if (msgrcv(msgid, &message, MSG_SIZE, joueur, 0) == -1) {
+                if (msgrcv(msgid, &message, MSG_SIZE, joueur+10, 0) == -1) {
                     perror("Erreur lors de la réception de la carte");
                     exit(EXIT_FAILURE);
                 }
-                sleep(1);
                 index = atoi(message.msg_text)-1;
 
                 //on vérifie si la carte est valide
@@ -531,7 +518,6 @@ void score_final_joueurs (struct paquet *paquet_preneur, char *contrat_final, in
 
 int main() {
     int preneur;
-    struct msg_buffer messageRecu;
     int ordre_joueurs[MAX_CLIENTS] ;
     struct paquet jeu;
     char *message2 = "Le jeu est terminé !";
@@ -614,7 +600,6 @@ int main() {
         }
 
         envoyer_message (msgid, message2);
-        sleep(2);
         printf("La partie est terminée.\n");
 
         //On met à jour l'ordre des joueurs pour la prochaine partie. C'ets le joueur suivant qui commencera. 
