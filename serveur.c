@@ -66,17 +66,31 @@ void attendre_clients(int msgid) {
 }
 
 //fonction permettant d'envoyer la jeu du client choisit 
-void envoyer_jeu(int msgid, struct paquet *paquet, int preneur) {
+void envoyer_jeu(int msgid, struct paquet *paquet, int preneur, int param) {
     struct msg_buffer message;
     char buffer[MSG_SIZE] = "";
     char carte_info[50];
 
-    for (int i = 0; i < paquet->nb_cartes; i++) {
-        snprintf(carte_info, sizeof(carte_info), "%d %c %s\n", i + 1,
-                 paquet->jeu[i].couleur, 
-                 paquet->jeu[i].valeur);
-        strcat(buffer, carte_info);
+    if (param == 0) {
+        for (int i = 0; i < paquet->nb_cartes; i++) {
+            snprintf(carte_info, sizeof(carte_info), "%d %c %s\n", i + 1,
+                    paquet->jeu[i].couleur, 
+                    paquet->jeu[i].valeur);
+            strcat(buffer, carte_info);
+        }
+  } else {
+        // Envoie en respectant l'ordre circulaire à partir de 'param'
+        for (int i = 0; i < paquet->nb_cartes; i++) {
+            // Calcule le joueur recevant cette carte (ordre circulaire)
+            int joueur_actuel = ((param - 1 + i) % MAX_CLIENTS) + 1;
+            snprintf(carte_info, sizeof(carte_info), "%d %c %s (joueur %d)\n", i + 1,
+                    paquet->jeu[i].couleur, 
+                    paquet->jeu[i].valeur,
+                    joueur_actuel);
+            strcat(buffer, carte_info);
+        }
     }
+            
 
     message.msg_type = preneur;
     printf ("\nEnvoi du jeu au joueur %d ...\n", preneur);
@@ -88,14 +102,14 @@ void envoyer_jeu(int msgid, struct paquet *paquet, int preneur) {
         exit(EXIT_FAILURE);
     }
     printf("Jeu envoyé au joueur %d.\n\n", preneur);
-    printf("%s\n\n", message.msg_text);
 }
 
 //fonction envoyant un paquet à tous les joueurs 
-void envoyer_jeu_joueurs (int msgid, struct paquet *paquet) {
+void envoyer_jeu_joueurs (int msgid, struct paquet *paquet, int param) {
     //on envoie le message à chaque joueur
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        envoyer_jeu(msgid,paquet,i+1);
+        // Calcule l'index du joueur suivant de manière circulaire
+        envoyer_jeu(msgid, paquet, i+1, param);
     }
     printf("Paquet envoyé à tous les joueurs.\n");
 }
@@ -110,7 +124,7 @@ void distribuer_cartes_aux_clients(int msgid, struct paquet *jeu) {
     //on envoie le paquet de chaque joueur à chaque client
     //le paquet est sous forme d'un texte , donc on le convertit en chaine de caractères
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        envoyer_jeu(msgid,joueurs[i],i+1);
+        envoyer_jeu(msgid,joueurs[i],i+1,0);
 
         if (msgrcv(msgid, &message, MSG_SIZE, i + 1, 0) == -1) {
             perror("Erreur lors de la réception de la confirmation de réception des cartes");
@@ -228,7 +242,7 @@ struct paquet *envoyer_jeu_avec_chien(int msgid, int preneur, struct paquet *chi
     }
 
     // envoie du paquet contenant ses 18 cartes et les 6 cartes du chien
-    envoyer_jeu(msgid,paquet,preneur);
+    envoyer_jeu(msgid,paquet,preneur,0);
     
     printf("\nPaquet envoyé au preneur, avec %d cartes.\n\n", paquet->nb_cartes);
 
@@ -301,7 +315,7 @@ void faire_chien(int msgid, struct paquet *chien, int preneur, struct paquet *pa
                paquet_preneur.nb_cartes);
         printf("Le paquet contient maintenant %d cartes.\n\n", paquet->nb_cartes);
         //on envoie le nouveau jeu 
-        envoyer_jeu (msgid, paquet, preneur);
+        envoyer_jeu (msgid, paquet, preneur,0);
         sleep(1);
         non_valide = true;
     }
@@ -358,6 +372,7 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
     char couleurJouee;
     int joueurQuiPrendEnsuite ;
     int premierJoueur;
+    int joueurDepart;
 
     while (joueur1.nb_cartes>0){
         carte_valide = false; //au depart la carte n'est pas valide
@@ -370,6 +385,7 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
         //on demande a chaque joueur de jouer une carte
         for (int i = 0; i < MAX_CLIENTS; i++) {
             joueur = ordre[i];
+            joueurDepart = ordre[0];
             printf("\nTour du joueur %d\n\n", joueur);
 
             //on envoie au joueur que c'est à lui de jouer
@@ -389,7 +405,7 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
             sleep(1); //pause pour que le joueur puisse lire le message
 
             //on envoie le jeu du joueur pour qu'il puisse choisir sa carte
-            envoyer_jeu(msgid, joueurs[joueur-1], joueur);
+            envoyer_jeu(msgid, joueurs[joueur-1], joueur,0);
             sleep(1);
 
             while (!carte_valide) {
@@ -437,11 +453,12 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
                 //on modifie la couleur jouee, c'est celle du premier joueur qui a joué
                 if (premierJoueur == 0) {
                     couleurJouee = carte_jouee.couleur;
-                    premierJoueur = 1;
+                    printf("couleur: %d\n", couleurJouee);
+                    premierJoueur = joueur;
                 }
             }
             printf("Envoie du jeu aux joueurs\n\n");
-            envoyer_jeu_joueurs(msgid, &paquet_en_cours);
+            envoyer_jeu_joueurs(msgid, &paquet_en_cours,joueurDepart);
             carte_valide = false;
         }
 
@@ -577,7 +594,7 @@ int main() {
         printf("Le preneur est le joueur %d.\n\n", preneur);
 
         printf("Montrons le chien...\n\n");
-        envoyer_jeu_joueurs(msgid, &chien);
+        envoyer_jeu_joueurs(msgid, &chien,0);
 
         //Le preneur fait son chien
         faire_chien (msgid, &chien, preneur, joueurs[preneur-1]);

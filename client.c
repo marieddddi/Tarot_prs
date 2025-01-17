@@ -17,19 +17,7 @@ struct msg_buffer {
     char msg_text[MSG_SIZE];
 };
 
-void afficher_nombre_messages(int msgid) {
-    struct msqid_ds buf;
-
-    // Récupérer les informations sur la file de messages
-    if (msgctl(msgid, IPC_STAT, &buf) == -1) {
-        perror("Erreur lors de la récupération des informations de la file de messages");
-        exit(EXIT_FAILURE);
-    }
-
-    // Afficher le nombre de messages
-    printf("Nombre de messages dans la file : %ld\n", buf.msg_qnum);
-}
-
+//envoie au serveur que le joueur est prêt
 void joueur_pret(int msgid, int client_id) {
     struct msg_buffer message;
     message.msg_type = client_id;
@@ -41,19 +29,42 @@ void joueur_pret(int msgid, int client_id) {
     printf("Joueur %d prêt.\n", client_id);
 }
 
-void recevoir_message (int msgid, int client_id) {
+//fonction permettant de recevoir un message
+void recevoir_message (int msgid, int client_id, int mode) {
     struct msg_buffer message;
     if (msgrcv(msgid, &message, MSG_SIZE, client_id, 0) == -1) {
         perror("Erreur lors de la réception du message");
         exit(EXIT_FAILURE);
     }
-    printf("%s\n", message.msg_text);
+    switch (mode) {
+        case 1:
+            printf("%s\n", message.msg_text);
+            break;
+        case 2:
+            printf("Cartes reçues par le joueur %d :\n%s\n", client_id, message.msg_text);
+            break;
+        case 3:
+            printf("Choisissez un contrat parmi : %s\n", message.msg_text);
+            break;
+        case 4:
+            printf("Voici le chien :\n%s\n", message.msg_text);
+            break;
+        case 5:
+            printf("Voici le jeu reçu : \n%s\n", message.msg_text);
+            break;
+        case 6:
+            printf("Voici votre jeu :\n%s\n", message.msg_text);
+            break;
+        default:
+            break;
+    }
     sleep(0.5);
 }
 
+//fonction permettant de recevoir un message de fin indiquant que le jeu est terminé
 void recevoir_message_fin (int msgid, int client_id) {
     struct msg_buffer message;
-    while (strcmp (message.msg_text, "Le jeu est terminé !") != 0) {
+    while (strcmp(message.msg_text, "Le jeu est terminé !") != 0) {
         if (msgrcv(msgid, &message, MSG_SIZE, client_id, 0) == -1) {
             perror("Erreur lors de la réception du message");
             exit(EXIT_FAILURE);
@@ -63,15 +74,13 @@ void recevoir_message_fin (int msgid, int client_id) {
     }
 }
 
+//fonction permettant de recevoir ses cartes 
 void recevoir_cartes(int msgid, int client_id) {
     struct msg_buffer message;
 
-    if (msgrcv(msgid, &message, MSG_SIZE, client_id, 0) == -1) {
-        perror("Erreur lors de la réception des cartes");
-        exit(EXIT_FAILURE);
-    }
-    printf("Cartes reçues par le joueur %d :\n%s\n", client_id, message.msg_text);
-    sleep(1);
+    //on recoit les cartes
+    recevoir_message(msgid,client_id,2);
+
     message.msg_type = client_id;
     strcpy(message.msg_text, "Cartes reçues");
 
@@ -82,20 +91,22 @@ void recevoir_cartes(int msgid, int client_id) {
     sleep(1);
 }
 
+//fonction permettant de faire son contrat parmis la liste des contrats possible s(envoyé par le serveur)
 int choix_contrat_client(int msgid, int client_id) {
     struct msg_buffer message;
     struct msg_buffer message_reponse;
+    char contrat_choisi[MSG_SIZE];
+    int reponse_valide = 0;
+    char *endptr;
+    int preneur;
 
+    //on recoit les contrats disponibles
     if (msgrcv(msgid, &message, MSG_SIZE, client_id, 0) == -1) {
-        perror("Erreur lors de la réception de la demande de contrat");
+        perror("Erreur lors de la réception du message");
         exit(EXIT_FAILURE);
     }
-    sleep(1);
-
-    char contrat_choisi[MSG_SIZE];
     printf("Choisissez un contrat parmi : %s\n", message.msg_text);
 
-    int reponse_valide = 0;
     while (!reponse_valide) {
         fgets(contrat_choisi, sizeof(contrat_choisi), stdin);
         contrat_choisi[strcspn(contrat_choisi, "\n")] = '\0';
@@ -125,8 +136,8 @@ int choix_contrat_client(int msgid, int client_id) {
         perror("Erreur lors de la réception du preneur");
         exit(EXIT_FAILURE);
     }
-    char *endptr;
-    int preneur = strtol(message.msg_text, &endptr, 10);
+    
+    preneur = strtol(message.msg_text, &endptr, 10);
     if (*endptr != '\0') {
         fprintf(stderr, "Erreur : le message reçu n'est pas un entier valide (%s)\n", message.msg_text);
         exit(EXIT_FAILURE);
@@ -134,34 +145,28 @@ int choix_contrat_client(int msgid, int client_id) {
     return preneur;
 }
 
+//fonction qui affiche le chien reçu par le preneur
 void montrer_chien(int msgid, int client_id) {
     struct msg_buffer message;
 
-    if (msgrcv(msgid, &message, MSG_SIZE, client_id, 0) == -1) {
-        perror("Erreur lors de la réception du chien");
-        exit(EXIT_FAILURE);
-    }
-    printf("Voici le chien :\n%s\n", message.msg_text);
+    //on recoit le chien et on l'affiche
+    recevoir_message(msgid,client_id,4);
 }
 
+//Le preneur peut faire son chien, en envoyant une carte à la fois. Le serveur va la valider ou non
 void faire_chien_client(int msgid, int preneur) {
     struct msg_buffer message_reponse;
     bool ok = false;
+    int carte;
+    struct msg_buffer message_reponse2;
 
-    //on affihce le nb de mess dans la file
-    afficher_nombre_messages (msgid);
-
-     if (msgrcv(msgid, &message_reponse, MSG_SIZE, preneur, 0) == -1) {
-            perror("Erreur lors de la réception du message");
-            exit(EXIT_FAILURE);
-        }
-        printf("Voici le jeu reçu : %s\n", message_reponse.msg_text);
-
+    //on recoit le jeu
+    recevoir_message(msgid,preneur,5);
 
     for (int i = 0; i < 6; i++) {
         while (!ok) {
-            int carte = 0;
-            // Demander à l'utilisateur de choisir une carte
+            carte = 0;
+            // Demande au joueur de choisir une carte
             while ( carte <= 0 || carte > 24-i) {
                 printf("Choisissez une carte à mettre dans le chien (1-%d) : ", 24-i);
                 scanf("%d", &carte);
@@ -178,8 +183,7 @@ void faire_chien_client(int msgid, int preneur) {
             }
             sleep(0.5);
 
-            //on recupere le mess pour savoir si la carte ets bonne ou non
-            struct msg_buffer message_reponse2;
+            //on recupere le mess pour savoir si la carte est bonne ou non
             if (msgrcv(msgid, &message_reponse2, MSG_SIZE, preneur , 0) == -1) {
                 perror("Erreur lors de la réception du message");
                 exit(EXIT_FAILURE);
@@ -196,36 +200,34 @@ void faire_chien_client(int msgid, int preneur) {
         }
         ok = false;
         //on affiche le nouveau jeu 
-        if (msgrcv(msgid, &message_reponse, MSG_SIZE, preneur, 0) == -1) {
-            perror("Erreur lors de la réception du message");
-            exit(EXIT_FAILURE);
-        }
-        sleep(0.5);
-        printf("Voici le jeu reçu : \n %s\n", message_reponse.msg_text);
+        recevoir_message(msgid,preneur,5);
     }
 }
 
+//Fonction principale, qui gère un tour de jeu
 void faire_un_tour(int msgid, int joueur_id) {
     struct msg_buffer message_reponse;
+    bool carte_valide;
+    bool permissionJouer;
+    int carte_choisie;
 
     for(int i = 18; i > 0 ; i--) { //on doit faire 18 tours car on a tous 18 cartes
-        bool carte_valide = false;
-        bool permissionJouer = false;
-        int carte_choisie = 0;
+        carte_valide = false;
+        permissionJouer = false;
+        carte_choisie = 0;
         //memset (&message_reponse, 0, sizeof(message_reponse));
 
         while (!permissionJouer) {
             if (msgrcv(msgid, &message_reponse, sizeof(message_reponse.msg_text), joueur_id, 0 ) == -1) {
-                printf ("messgae: %s\n", message_reponse.msg_text);
                 perror("Erreur lors de la réception du message");
                 exit(EXIT_FAILURE);
             }
-            //printf ("%s\n", message_reponse.msg_text);
             sleep(0.5);
             if (strcmp(message_reponse.msg_text, "a toi") == 0) {
                 printf("C'est à toi de jouer !\n");
 
                 // Envoyer une confirmation au serveur
+                printf("je suis pret\n");
                 message_reponse.msg_type = joueur_id;
                 strcpy(message_reponse.msg_text, "pret");
                 if (msgsnd(msgid, &message_reponse, sizeof(message_reponse.msg_text), 0) == -1) {
@@ -238,14 +240,7 @@ void faire_un_tour(int msgid, int joueur_id) {
             else printf ("Jeu en cours: %s\n", message_reponse.msg_text);
         }
         sleep(1);
-
-        if (msgrcv(msgid, &message_reponse, MSG_SIZE, joueur_id, 0) == -1) {
-            perror("Erreur lors de la réception du jeu initial");
-            exit(EXIT_FAILURE);
-        }
-        sleep(0.5);
-
-        printf("Voici votre jeu :\n%s\n", message_reponse.msg_text);
+        recevoir_message(msgid,joueur_id,6);
 
         while (!carte_valide) {
             carte_choisie = 0;
@@ -279,33 +274,24 @@ void faire_un_tour(int msgid, int joueur_id) {
         }
 
         printf("Jeu mis à jour :\n");
-        if (msgrcv(msgid, &message_reponse, MSG_SIZE, joueur_id, 0) == -1) {
-            perror("Erreur lors de la réception du jeu mis à jour");
-            exit(EXIT_FAILURE);
-        }
-        printf("%s", message_reponse.msg_text);
+        recevoir_message(msgid,joueur_id,1);
     }
 }
 
+//affiche les scores
 void afficher_scores(float *scores) {
     printf("Scores des joueurs :\n");
     for (int i = 0; i < 4; i++) {
         printf("Joueur %d : %.2f\n", i + 1, scores[i]);
     }
 }
-void vider_messages_client(int msgid, int client_id) {
-    struct msg_buffer message;
-    while (msgrcv(msgid, &message, MSG_SIZE, client_id, IPC_NOWAIT) != -1) {
-        printf("Message résiduel reçu par le client : %s\n", message.msg_text);
-    }
-}
 
+//Joue uen partie, on fait 18 tours
 void jouer_partie (int client_id, int msgid) {
     int preneur = 0;
     struct msg_buffer message;
     
     //jeu
-   // joueur_pret(msgid, client_id);
     while (preneur == 0){
         recevoir_cartes(msgid, client_id);
         preneur = choix_contrat_client(msgid, client_id);
@@ -323,13 +309,14 @@ void jouer_partie (int client_id, int msgid) {
 
 int main(int argc, char *argv[]) {
     int choix;
+    struct msg_buffer message;
+    int client_id;
+
+
     if (argc != 2) {
         printf("Usage: %s <client_id>\n", argv[0]);
         return EXIT_FAILURE;
     }
-
-
-    struct msg_buffer message;
 
     // Connexion à la mémoire partagée pour les scores
     int shmid = shmget(SHM_KEY, 4 * sizeof(float), 0666);
@@ -345,11 +332,12 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    int client_id = atoi(argv[1]);
+    client_id = atoi(argv[1]);
     /* on affiche un menu demandant au joueur de choisir une action:
     1- joueur une partie 
     2- afficher les scores
-    3- quitter le jeu */
+    3- afficher les règles
+    4- quitter le jeu */
     printf("Bienvenue dans le jeu de tarot !\n");
 
     while (1) {
@@ -381,9 +369,6 @@ int main(int argc, char *argv[]) {
                 strcpy (message.msg_text, "jouer");
                 if (msgsnd (msgid, &message, sizeof(message.msg_text), 0) == -1) {
                     perror("Erreur lors de l'envoi du message");
-                    printf ("texte: %s\n", message.msg_text);
-                    printf("type: %d\n", message.msg_type);
-                    printf("msgid: %d\n", msgid);
                     return EXIT_FAILURE;
                 }
                 sleep(1);
@@ -467,11 +452,6 @@ int main(int argc, char *argv[]) {
                 printf("Choix non valide. Veuillez réessayer.\n");
         }
     }
-
-    // Détachement de la mémoire partagée
-   // if (shmdt(scores) == -1) {
-   //     perror("Erreur lors du détachement de la mémoire partagée");
-  //  }
 
     return EXIT_SUCCESS;
 
