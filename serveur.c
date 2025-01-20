@@ -49,8 +49,30 @@ void envoyer_message(int msgid, char *message) {
     }
 }
 
-//fonction permettant de recevoir un message de tous les clients indiquant qu'ils veulent jouer
+//fonction permettant de recevoir un message de tous les joueurs indiquant qu'ils veulent jouer
+//cette fonction lance aussi 4 terminaux pour les 4 joueurs
 void attendre_clients(int msgid) {
+
+    const char *command = "gnome-terminal";
+    const char *client_command = "./client";
+
+    // Boucle pour créer 4 terminaux avec les arguments 1 à 4
+    for (int i = 1; i <= 4; i++) {
+        pid_t pid = fork();
+        if (pid == 0) { // Processus enfant
+            char arg[2];
+            snprintf(arg, sizeof(arg), "%d", i); // Convertit i en chaîne
+            char *args[] = {(char *)command, "--", (char *)client_command, arg, NULL};
+            execvp(command, args);
+            perror("execvp failed"); // S'affiche en cas d'échec
+            exit(EXIT_FAILURE); // Quitte si execvp échoue
+        } else if (pid < 0) { // En cas d'erreur de fork
+            perror("fork failed");
+            exit(EXIT_FAILURE);
+        }
+
+    }
+
     int client_pret = 0;
     struct msg_buffer message;
     //tant qu'on n'a pas reçu le message de tous les clients, ce message a 5 comme type
@@ -65,6 +87,7 @@ void attendre_clients(int msgid) {
     }
 }
 
+
 // Fonction permettant d'envoyer le jeu au client choisi
 void envoyer_jeu(int msgid, struct paquet *paquet, int preneur, int param) {
     struct msg_buffer message;
@@ -75,7 +98,7 @@ void envoyer_jeu(int msgid, struct paquet *paquet, int preneur, int param) {
     const char *reset = "\033[0m";  // Réinitialisation des couleurs
 
     const char *symbole;
-        const char *couleur;
+    const char *couleur;
 
     char buffer[1024] = "";  // Buffer
     char temp[100];
