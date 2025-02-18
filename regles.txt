@@ -1,0 +1,68 @@
+Règles du jeu de tarot
+
+1- Le jeu se joue à 4 joueurs.
+2- Le jeu se joue avec un jeu de 78 cartes. Chaque joueur a 18 cartes
+
+Explication des cartes:
+    1- On a des cartes simples: 1,2,3,4,5,6,7,8,9,10,V,C,D,R (de la moins forte à la plus forte) dans les couleurs suivantes: coeur (C), trèfle (T), carreau (K) et pique (P)
+    2- On a des atouts: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21 (de la moins forte à la plus forte) représentés par la couleur ' '
+    3- On a 3 bouts: les atouts 1 et 21 et l'excuse (*)
+
+    L'atout est un joker que l'on peut jouer à n'importe quel moment de la partie.
+    Peut importe qui prend, cette carte nous appartient toujours. On la mettra dans notre paquet une fois jouée 
+
+Debut du jeu:
+    Chaque joueur a 18 cartes en main
+    A tour de role, selon un ordre défini, chaque joueur doit choisir le contrat qu'il souhaite faire
+    
+    Le contrat est choisi parmi les 4 contrats possibles :
+    1- Passe: on ne fait rien
+    2- Petite: on prend en estimant qu'on a un 'petit' jeu. Notre score sera x1
+    3- Garde: on prend en estimant qu'on a un bon jeu. Notre score sera x2
+
+    A savoir: on ne peut qu'augmenter de contrat à partir de la petite.
+    Par exemple, le joueur 1 choisit de passer. Le joueur 2 peut soit: passer, petite, garde. Imaginons qu'il fasse une petite, le joueur 3 ne peut plus que faire une petite ou une garde.
+    Le joueur avec le contrat le plus élevé est celui qui prend.
+    On montre le chien à tous les joueurs.
+
+Faire son chien:
+    Le joueur qui prend va faire son chien. Le chien est composé de 6 cartes. 
+    Le joueur doit intégrer les cartes du chient dans son jeu et en enlver 6.
+    Attention, il ne doit pas enlever d'atouts, de bouts ou de rois à part s'il n'a pas le choix. Dans quel cas, il doit le montrer.
+
+Déroulement du jeu: 
+    Le joueur qui prend tient tout seul. Les autres joueurs tiennent ensemble.
+    Selon l'ordre, le premier joueur choisit une carte à jouer. Il peut jouer une carte de son jeu ou un atout.
+    Le joueur suivant doit jouer une carte de la même couleur que la carte précédente.  
+    Si le joueur suivant n'a pas de carte de la couleur précédente, il peut jouer un atout.
+    Attention, si un atout a été joué avant, le joueur suivant doit jouer un atout plus forte.
+    Si le joueur n'a pas d'atout plus fort, il peut jouer un atout plus faible.
+    S'il n'a pas d'atout, il peut joueur n'importe quelle carte, qui sera perdu pour lui.
+    Le jeu se poursuit ainsi jusqu'à ce que tous les joueurs aient joué.
+    C'est le joueur qui a la plus grosse carte qui gagne la manche. 
+    Il récupère toutes les cartes de la manche et les met dans son paquet.
+    Le jeu se poursuit ainsi jusqu'à ce que tous les joueurs aient joué toutes leurs cartes.
+
+Scores: 
+    Les cartes sont comptées par paire comme suit:
+    Un bout + une petite carte (carte simple de valeur 1,2,3,4,5,6,7,8,9,10) vaut 5 points.
+    Un roi + une petite carte vaut 5 points.
+    Une dame + une petite vaut 4 points.
+    Un cavalier + une petite carte vaut 3 points.
+    Un valet + une petite carte vaut 2 points.
+    2 petites cartes ou 2 atouts (or bouts) ou 1 petite carte + 1 atout (or bouts) valent 1 point.
+    On compte donc toutes les cartes du paquet du preneur comme expliqué ci-dessus.
+    Le preneur doit faire un certain nombre de points pour gagner la partie selon les bouts en main.
+    Si le preneur a les 3 bouts, il doit faire 36 points.
+    Si le preneur a 2 bouts, il doit faire 41 points. 
+    Si le preneur a 1 bout, il doit faire 51 points. 
+    Si le preneur n'a pas de bout, il doit faire 56 points.
+    Pour calculer le score fait, on soustrait le total calculé précédemment au score à faire.
+    Si le score fait est positif, le preneur gagne la partie. On dit qu'elle est faire. 
+    Si le score fait est négatif, le preneur perd la partie. On dit qu'il a chuté. 
+    Tout contrat valant arbitrairement 25 points, on rajoute 25 points au nombre de points de gain ou de perte.
+    On multiplie ensuite ce total par 1 si on a choisit une petite ou par 2 si on a fait une garde. 
+    Les adversaires auront un score de l'inverse de celui du preneur.
+    Enfin, on multiplie par 3 le score du preneur étant donné qu'il était 1 contre 3.
+
+    

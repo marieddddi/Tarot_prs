@@ -1,0 +1,8 @@
+tarot:  
+    -fonctions.h
+    -fonctions.c
+    -serveur.c
+    -joueur.c
+    -makefile
+    -regles.txt
+    -test.txt

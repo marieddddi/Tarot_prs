@@ -49,11 +49,9 @@ void envoyer_message(int msgid, char *message) {
     }
 }
 
-//fonction permettant de recevoir un message de tous les joueurs indiquant qu'ils veulent jouer
-//cette fonction lance aussi 4 terminaux pour les 4 joueurs
-void attendre_clients(int msgid) {
-
-    const char *command = "gnome-terminal";
+void lancement_terminaux_clients(int msgid) {
+    //lancement des terminaux clients
+     const char *command = "gnome-terminal";
     const char *client_command = "./client";
 
     // Boucle pour créer 4 terminaux avec les arguments 1 à 4
@@ -72,7 +70,12 @@ void attendre_clients(int msgid) {
         }
 
     }
+}
 
+
+//fonction permettant de recevoir un message de tous les joueurs indiquant qu'ils veulent jouer
+//cette fonction lance aussi 4 terminaux pour les 4 joueurs
+void attendre_clients(int msgid) {
     int client_pret = 0;
     struct msg_buffer message;
     //tant qu'on n'a pas reçu le message de tous les clients, ce message a 5 comme type
@@ -606,13 +609,16 @@ int main() {
     ordre_joueurs[2] = 3;
     ordre_joueurs[3] = 4;
 
+     int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
+    if (msgid == -1) {
+        perror("Erreur lors de la création de la file de messages");
+        exit(EXIT_FAILURE);
+    }
+
+    lancement_terminaux_clients (msgid);
     while(1){
         //On crée une nouvelle boite aux lettres à chaque partie
-        int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
-        if (msgid == -1) {
-            perror("Erreur lors de la création de la file de messages");
-            exit(EXIT_FAILURE);
-        }
+       
 
         //on attend un message indiquant "jouer"
         printf("Attente des joueurs...\n");
@@ -675,9 +681,9 @@ int main() {
         }
 
         //On supprime la boite aux lettres
-        msgctl(msgid, IPC_RMID, NULL);
+      //  msgctl(msgid, IPC_RMID, NULL);
     }
-
+    msgctl(msgid, IPC_RMID, NULL);
     // Détachement et suppression de la mémoire partagée
     if (shmdt(scores) == -1) {
         perror("Erreur lors du détachement de la mémoire partagée");

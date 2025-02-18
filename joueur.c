@@ -8,6 +8,7 @@
 #include <sys/shm.h>
 #include <errno.h>
 
+
 #define MSG_KEY 1234
 #define MSG_SIZE 1024
 #define SHM_KEY 5678
@@ -293,6 +294,7 @@ void jouer_partie (int client_id, int msgid) {
 }
 
 
+
 int main(int argc, char *argv[]) {
     int choix;
     struct msg_buffer message;
@@ -363,69 +365,17 @@ int main(int argc, char *argv[]) {
                 afficher_scores(scores);
                 break;
             case 3:
-                //affichage des règles
-                printf("Règles du jeu de tarot :\n");
-                printf("1- Le jeu se joue à 4 joueurs.\n");
-                printf("2- Le jeu se joue avec un jeu de 78 cartes. Chaque joueur a 18 cartes\n");
-                printf("\nExplication des cartes:\n");
-                printf("1- On a des cartes simples: 1,2,3,4,5,6,7,8,9,10,V,C,D,R (de la moins forte à la plus forte) dans les couleurs suivantes: coeur (C), trèfle (T), carreau (K) et pique (P)\n");
-                printf("2- On a des atouts: 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21 (de la moins forte à la plus forte) représentés par la couleur ' '\n");
-                printf("3- On a 3 bouts: les atouts 1 et 21 et l'excuse (*)\n");
-                printf("L'atout est un joker que l'on peut jouer à n'importe quel moment de la partie.\n");
-                printf("Peut importe qui prend, cette carte nous appartient toujours. On la mettra dans notre paquet une fois jouée \n");
-                printf("\n\n");
-                printf("Debut du jeu: n");
-                printf("Chaque joueur a 18 cartes en main\n");
-                printf("A tour de role, selon un ordre défini, chaque joueur doit choisir le contrat qu'il souhaite faire\n");
-                printf("Le contrat est choisi parmi les 4 contrats possibles : \n ");
-                printf("1- Passe: on ne fait rien\n");
-                printf("2- Petite: on prend en estimant qu'on a un 'petit' jeu. Notre score sera x1\n");
-                printf("3- Garde: on prend en estimant qu'on a un bon jeu. Notre score sera x2\n");
-                printf("\nA savoir: on ne peut qu'augmenter de contrat à partir de la petite.\n");
-                printf("Par exemple, le joueur 1 choisit de passer. Le joueur 2 peut soit: passer, petite, garde. Imaginons qu'il fasse une petite, le joueur 3 ne peut plus que faire une petite ou une garde.\n");
-                printf("Le joueur avec le contrat le plus élevé est celui qui prend.\n");
-                printf("On montre le chien à tous les joueurs.\n");
-                printf("\n\n");
-                printf("Faire son chien:\n");
-                printf("Le joueur qui prend va faire son chien. Le chien est composé de 6 cartes. \n");
-                printf("Le joueur doit intégrer les cartes du chient dans son jeu et en enlver 6.\n");
-                printf("Attention, il ne doit pas enlever d'atouts, de bouts ou de rois à part s'il n'a pas le choix. Dans quel cas, il doit le montrer.\n");
-                printf ("\n\n");
-                printf("Déroulement du jeu: \n");
-                printf("Le joueur qui prend tient tout seul. Les autres joueurs tiennent ensemble.\n");
-                printf("Selon l'ordre, le premier joueur choisit une carte à jouer. Il peut jouer une carte de son jeu ou un atout.\n");
-                printf("Le joueur suivant doit jouer une carte de la même couleur que la carte précédente.\n");  
-                printf("Si le joueur suivant n'a pas de carte de la couleur précédente, il peut jouer un atout.\n");
-                printf("Attention, si un atout a été joué avant, le joueur suivant doit jouer un atout plus forte.\n");
-                printf("Si le joueur n'a pas d'atout plus fort, il peut jouer un atout plus faible.\n");
-                printf("S'il n'a pas d'atout, il peut joueur n'importe quelle carte, qui sera perdu pour lui.\n");
-                printf("Le jeu se poursuit ainsi jusqu'à ce que tous les joueurs aient joué.\n");
-                printf("C'est le joueur qui a la plus grosse carte qui gagne la manche. \n");
-                printf("Il récupère toutes les cartes de la manche et les met dans son paquet.\n");
-                printf("Le jeu se poursuit ainsi jusqu'à ce que tous les joueurs aient joué toutes leurs cartes.\n");
-                printf("\n\n");
-                printf("Scores: \n");
-                printf("Les cartes sont comptées par paire comme suit:\n");
-                printf("Un bout + une petite carte (carte simple de valeur 1,2,3,4,5,6,7,8,9,10) vaut 5 points.\n");
-                printf("Un roi + une petite carte vaut 5 points.\n");
-                printf("Une dame + une petite vaut 4 points.\n");
-                printf("Un cavalier + une petite carte vaut 3 points.\n");
-                printf("Un valet + une petite carte vaut 2 points.\n");
-                printf("2 petites cartes ou 2 atouts (or bouts) ou 1 petite carte + 1 atout (or bouts) valent 1 point.\n");
-                printf("On compte donc toutes les cartes du paquet du preneur comme expliqué ci-dessus.\n");
-                printf("Le preneur doit faire un certain nombre de points pour gagner la partie selon les bouts en main.\n");
-                printf("Si le preneur a les 3 bouts, il doit faire 36 points.\n");
-                printf("Si le preneur a 2 bouts, il doit faire 41 points. \n");
-                printf("Si le preneur a 1 bout, il doit faire 51 points. \n");
-                printf("Si le preneur n'a pas de bout, il doit faire 56 points.\n");
-                printf("Pour calculer le score fait, on soustrait le total calculé précédemment au score à faire.\n");
-                printf("Si le score fait est positif, le preneur gagne la partie. On dit qu'elle est faire. \n");
-                printf("Si le score fait est négatif, le preneur perd la partie. On dit qu'il a chuté. \n");
-                printf("Tout contrat valant arbitrairement 25 points, on rajoute 25 points au nombre de points de gain ou de perte.\n");
-                printf("On multiplie ensuite ce total par 1 si on a choisit une petite ou par 2 si on a fait une garde. \n");
-                printf("Les adversaires auront un score de l'inverse de celui du preneur.\n");
-                printf("Enfin, on multiplie par 3 le score du preneur étant donné qu'il était 1 contre 3. \n");
-                printf("\n\n");
+                //ouvrir et afficher le fichier regles.txt
+                FILE *fichier = fopen("regles.txt", "r");
+                if (fichier == NULL) {
+                    perror("Erreur lors de l'ouverture du fichier");
+                    return EXIT_FAILURE;
+                }
+                char ligne[100];
+                while (fgets(ligne, sizeof(ligne), fichier) != NULL) {
+                    printf("%s", ligne);
+                }
+                fclose(fichier);
                 break;
             case 4:
                 printf("Au revoir !\n");
