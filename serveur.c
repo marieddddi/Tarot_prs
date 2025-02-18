@@ -51,7 +51,7 @@ void envoyer_message(int msgid, char *message) {
 
 void lancement_terminaux_clients(int msgid) {
     //lancement des terminaux clients
-     const char *command = "gnome-terminal";
+    const char *command = "gnome-terminal";
     const char *client_command = "./client";
 
     // Boucle pour créer 4 terminaux avec les arguments 1 à 4
@@ -60,15 +60,18 @@ void lancement_terminaux_clients(int msgid) {
         if (pid == 0) { // Processus enfant
             char arg[2];
             snprintf(arg, sizeof(arg), "%d", i); // Convertit i en chaîne
-            char *args[] = {(char *)command, "--", (char *)client_command, arg, NULL};
+            char command_with_bash[100];
+            snprintf(command_with_bash, sizeof(command_with_bash), "%s %s; exec bash", client_command, arg);
+
+            char *args[] = {(char *)command, "--", "bash", "-c", command_with_bash, NULL};
             execvp(command, args);
+
             perror("execvp failed"); // S'affiche en cas d'échec
             exit(EXIT_FAILURE); // Quitte si execvp échoue
         } else if (pid < 0) { // En cas d'erreur de fork
             perror("fork failed");
             exit(EXIT_FAILURE);
         }
-
     }
 }
 
@@ -497,7 +500,7 @@ void jouer_un_tour(int msgid, struct paquet *paquet_adversaires, struct paquet *
                 //on modifie la couleur jouee, c'est celle du premier joueur qui a joué
                 if (premierJoueur == 0) {
                     couleurJouee = carte_jouee.couleur;
-                    printf("couleur: %d\n", couleurJouee);
+                    printf("couleur: %c\n", couleurJouee);
                     premierJoueur = joueur;
                 }
             }
@@ -615,7 +618,7 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    lancement_terminaux_clients (msgid);
+    lancement_terminaux_clients(msgid);
     while(1){
         //On crée une nouvelle boite aux lettres à chaque partie
        
@@ -683,7 +686,7 @@ int main() {
         //On supprime la boite aux lettres
       //  msgctl(msgid, IPC_RMID, NULL);
     }
-    msgctl(msgid, IPC_RMID, NULL);
+   // msgctl(msgid, IPC_RMID, NULL);
     // Détachement et suppression de la mémoire partagée
     if (shmdt(scores) == -1) {
         perror("Erreur lors du détachement de la mémoire partagée");

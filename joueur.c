@@ -328,14 +328,14 @@ int main(int argc, char *argv[]) {
     4- quitter le jeu */
     printf("Bienvenue dans le jeu de tarot !\n");
 
-    while (1) {
-        int msgid = msgget(MSG_KEY, 0666);
-        if (msgid == -1) {
-            perror("Erreur lors de la connexion à la file de messages");
-            printf("val msgid : %d\n", msgid);
-            return EXIT_FAILURE;
-        }
+    int msgid = msgget(MSG_KEY, 0666);
+    if (msgid == -1) {
+        perror("Erreur lors de la connexion à la file de messages");
+        printf("val msgid : %d\n", msgid);
+        return EXIT_FAILURE;
+    }
 
+    while (1) {
         printf("Que voulez-vous faire ? \n");
         printf("1- Jouer une partie\n");
         printf("2- Afficher les scores\n");
@@ -359,7 +359,7 @@ int main(int argc, char *argv[]) {
                     return EXIT_FAILURE;
                 }
                 jouer_partie(client_id, msgid);
-                msgctl(msgid, IPC_RMID, NULL);
+               // msgctl(msgid, IPC_RMID, NULL);
                 break;
             case 2:
                 afficher_scores(scores);

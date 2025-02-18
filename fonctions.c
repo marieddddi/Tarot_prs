@@ -77,7 +77,7 @@ int valeur_en_int(const char *valeur) {
 
 //convertir un char en index
 int valeur_en_index(const char *valeur) {
-    const char *ordre[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "V", "C", "D", "R"};
+    const char *ordre[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "V", "C", "D", "R"};
     int taille = sizeof(ordre) / sizeof(ordre[0]);
 
     for (int i = 0; i < taille; i++) {
@@ -140,6 +140,8 @@ int qui_a_la_plus_forte_carte(struct carte *carteLaPlusForte, struct carte *cart
 
     int valeurActuelleAtout = valeur_en_int(carteActuelle->valeur);
     int valeurForteAtout = valeur_en_int(carteLaPlusForte->valeur);
+
+    printf ("valeurActuelle : %d, valeurForte : %d\n", valeurActuelle , valeurForte);
     
     //si precedent nul accepte
     if (carteLaPlusForte->couleur == 0) {
@@ -149,7 +151,7 @@ int qui_a_la_plus_forte_carte(struct carte *carteLaPlusForte, struct carte *cart
         return 0;
     }
     //si c'est la bonne couleur, on regarde qui a la plus forte carte (selon la valeur)
-    if (carteActuelle->couleur== couleurJouee &&
+    if (carteActuelle->couleur == couleurJouee &&
         !est_atout(carteLaPlusForte) && 
         !est_atout(carteActuelle) &&
         valeurActuelle > valeurForte &&
