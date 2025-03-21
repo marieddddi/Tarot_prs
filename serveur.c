@@ -93,7 +93,6 @@ void attendre_clients(int msgid) {
     }
 }
 
-
 // Fonction permettant d'envoyer le jeu au client choisi
 void envoyer_jeu(int msgid, struct paquet *paquet, int preneur, int param) {
     struct msg_buffer message;
@@ -156,9 +155,6 @@ void envoyer_jeu(int msgid, struct paquet *paquet, int preneur, int param) {
         exit(EXIT_FAILURE);
     }
 }
-
-
-    
 
 //fonction envoyant un paquet à tous les joueurs 
 void envoyer_jeu_joueurs (int msgid, struct paquet *paquet, int param) {
@@ -284,7 +280,6 @@ int demande_contrat(int msgid, int ordre_joueurs[], int nb_joueurs) {
     }
     return preneur;
 }
-
 
 //fonction permettant d'envoyer le jeu du preneur avec le chien en plus
 struct paquet *envoyer_jeu_avec_chien(int msgid, int preneur, struct paquet *chien, struct paquet *paquet) {
@@ -612,7 +607,7 @@ int main() {
     ordre_joueurs[2] = 3;
     ordre_joueurs[3] = 4;
 
-     int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
+    int msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
     if (msgid == -1) {
         perror("Erreur lors de la création de la file de messages");
         exit(EXIT_FAILURE);
@@ -620,9 +615,6 @@ int main() {
 
     lancement_terminaux_clients(msgid);
     while(1){
-        //On crée une nouvelle boite aux lettres à chaque partie
-       
-
         //on attend un message indiquant "jouer"
         printf("Attente des joueurs...\n");
         attendre_clients(msgid);
@@ -682,11 +674,17 @@ int main() {
             joueurQuiCommence=1;
             mettreAJourOrdreJoueurs(ordre_joueurs,joueurQuiCommence);
         }
-
+        sleep(3);
         //On supprime la boite aux lettres
-      //  msgctl(msgid, IPC_RMID, NULL);
+        msgctl(msgid, IPC_RMID, NULL);
+        //On crée une nouvelle boite aux lettres à chaque partie
+        msgid = msgget(MSG_KEY, IPC_CREAT | 0666);
+        if (msgid == -1) {
+            perror("Erreur lors de la création de la file de messages");
+            exit(EXIT_FAILURE);
+        }
     }
-   // msgctl(msgid, IPC_RMID, NULL);
+    msgctl(msgid, IPC_RMID, NULL);
     // Détachement et suppression de la mémoire partagée
     if (shmdt(scores) == -1) {
         perror("Erreur lors du détachement de la mémoire partagée");
